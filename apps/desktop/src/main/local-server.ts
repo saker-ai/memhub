@@ -277,7 +277,7 @@ function setDockerHostIfEmpty(contents: string, dockerHost: string): string {
       return line
     }
     updated = true
-    return `${match[1]}"${dockerHost}"${match[3]}`
+    return `${match[1]}${tomlStringLiteral(dockerHost)}${match[3]}`
   })
   if (updated) {
     appendLog(`detected Docker host: ${dockerHost}`)
@@ -303,12 +303,35 @@ function setTomlString(contents: string, sectionName: string, key: string, value
       return line
     }
     updated = true
-    return `${match[1]}"${value}"${match[3]}`
+    return `${match[1]}${tomlStringLiteral(value)}${match[3]}`
   })
   if (!updated) {
     throw new Error(`config key not found: [${sectionName}].${key}`)
   }
   return next.join('\n')
+}
+
+export function tomlStringLiteral(value: string): string {
+  return `"${value.replace(/[\b\t\n\f\r"\\\u0000-\u001f\u007f]/g, (char) => {
+    switch (char) {
+      case '\b':
+        return '\\b'
+      case '\t':
+        return '\\t'
+      case '\n':
+        return '\\n'
+      case '\f':
+        return '\\f'
+      case '\r':
+        return '\\r'
+      case '"':
+        return '\\"'
+      case '\\':
+        return '\\\\'
+      default:
+        return `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
+    }
+  })}"`
 }
 
 function prepareRuntime(command: ServerCommand): void {

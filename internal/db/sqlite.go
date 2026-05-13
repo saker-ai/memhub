@@ -26,14 +26,23 @@ func OpenSQLite(ctx context.Context, cfg config.SQLiteConfig) (*sql.DB, error) {
 
 func SQLiteFileDSN(cfg config.SQLiteConfig) string {
 	if dsn := strings.TrimSpace(cfg.DSN); dsn != "" {
-		return strings.TrimPrefix(dsn, "sqlite://")
+		return sqliteFileDSN(dsn)
 	}
-	path := strings.TrimPrefix(strings.TrimSpace(SQLiteDSN(cfg)), "sqlite://")
-	parsed, err := url.Parse(path)
-	if err != nil || parsed.RawQuery == "" {
+	return sqliteFileDSN(SQLiteDSN(cfg))
+}
+
+func sqliteFileDSN(dsn string) string {
+	path := strings.TrimPrefix(strings.TrimSpace(dsn), "sqlite://")
+	queryStart := strings.IndexByte(path, '?')
+	if queryStart < 0 {
 		return path
 	}
-	query := parsed.Query()
+	filePath := path[:queryStart]
+	rawQuery := path[queryStart+1:]
+	query, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return path
+	}
 	if busyTimeout := query.Get("_busy_timeout"); busyTimeout != "" {
 		query.Set("_pragma", "busy_timeout("+busyTimeout+")")
 		query.Del("_busy_timeout")
@@ -42,5 +51,8 @@ func SQLiteFileDSN(cfg config.SQLiteConfig) string {
 		query.Add("_pragma", "journal_mode(WAL)")
 		query.Del("_journal_mode")
 	}
-	return parsed.Path + "?" + query.Encode()
+	if encoded := query.Encode(); encoded != "" {
+		return filePath + "?" + encoded
+	}
+	return filePath
 }
