@@ -30,6 +30,17 @@
 
 ## 快速开始
 
+Memoh 提供两种形态：
+
+### Deploy Version
+
+面向长期在线、多人或多租户使用的自托管服务端栈。适合把 Memoh 跑在服务器、VM、NAS 或 Kubernetes 集群上，让机器人通过 Web UI 以及 Telegram、Discord、飞书、微信、邮件等外部渠道持续可用。
+
+<details>
+<summary><strong>部署 Memoh Server</strong></summary>
+
+当 Memoh 需要被多人访问、机器人需要持续运行，或需要接入公开/私有消息渠道时，请使用 deploy 版本。默认 Docker 部署会启动 server、Web UI、数据库迁移、容器运行时支持，以及 workspace 容器所需的配套服务。
+
 一键安装（**需先装 [Docker](https://www.docker.com/get-started/)**）：
 
 ```bash
@@ -70,6 +81,25 @@ kubectl apply -k deploy/kubernetes
 
 自定义与生产环境见 [DEPLOYMENT.md](DEPLOYMENT.md)。
 
+</details>
+
+### Desktop Version
+
+面向个人/本地使用的原生客户端。它会在你的电脑上启动并管理本地 Memoh server，打包 CLI 和本地 runtime 资源，是不维护单独服务端部署也能快速试用 Memoh 的最简单方式。
+
+<details>
+<summary><strong>安装 Memoh Desktop</strong></summary>
+
+当你希望有一个本地 App 代管 Memoh 时，请使用 desktop 版本。它面向单用户桌面工作流、本地记忆，以及 local/Docker-backed workspace。桌面端会运行自己的本地 server，因此和上面的 deploy 版本是两条不同形态。
+
+1. 从 [GitHub Releases](https://github.com/memohai/Memoh/releases) 下载对应平台安装包。
+2. 打开 Memoh。App 会启动本地 server、准备本地存储，并自动连接界面。
+3. 可选：如果需要在终端访问同一个本地 server，可从 App 菜单安装打包好的 `memoh` CLI。
+
+如果你需要共享服务器、远程访问、生产级长期在线，或希望渠道集成在桌面离线时仍持续运行，请选择 deploy 版本。
+
+</details>
+
 文档入口：
 
 - [关于 Memoh](https://docs.memoh.ai/about)
@@ -86,7 +116,7 @@ kubectl apply -k deploy/kubernetes
 设计取向是**常连不断**：AI 一直在线，数据留在你手里。
 
 - **轻、快**：适合家里或小工作室当基础设施，在边缘设备上也能跑得动。
-- **默认容器化**：每个机器人有独立容器，自带文件系统、网络与工具环境。
+- **默认 Workspace 隔离**：每个机器人可使用独立 workspace，自带文件系统、网络与工具环境。
 - **算力与数据拆着用**：能力可以走云上大模型，记忆和索引以本地为主，隐私更好拆。
 - **多用户设计**：用户之间、机器人和用户之间，分享和隐私有明确边界。
 - **全图形化配置**：机器人、渠道、MCP、技能、各项设置都在网页里配，不必写代码。
@@ -96,7 +126,8 @@ kubectl apply -k deploy/kubernetes
 ### 核心
 
 - 🤖 **多机多人**：多个机器人，可私聊、可群聊、可互相对话。群聊里能区分不同用户、各自记上下文，并支持跨平台身份绑定。
-- 📦 **容器化**：每个机器人在自己的 containerd 容器里，独立盘与网——和独占一台小机器差不多。支持快照、数据导入导出与版本管理。
+- 📦 **容器化 Workspace**：每个机器人可运行在独立 workspace 容器里，拥有自己的文件系统、网络、工具、快照、数据导入导出与版本管理。
+- 🖥️ **容器中的桌面环境**：可在机器人 workspace 容器内提供完整图形桌面，包括 VNC 访问和有头浏览器，用于需要真实 GUI 会话的网站和工作流。
 - 🗂️ **持久化文件**：每个机器人有可写的 home 目录，重启、升级、迁移不丢。机器人可自由读写、整理文件；你也可在网页文件管理器里浏览、上传、下载、编辑。
 - 🧠 **记忆工程**：由 LLM 做事实抽取，混合检索（稠密 + 稀疏 + BM25），可按提供方接长期记忆，有记忆整理与会话级上下文整理。可插后端：内置（关/稀疏/稠密）、[Mem0](https://mem0.ai)、OpenViking。
 - 💬 **渠道多**：Telegram、Discord、飞书、QQ、Matrix、Misskey、钉钉、企业微信、微信、公众号、邮件（Mailgun / SMTP / Gmail OAuth），以及自带 Web 界面。
@@ -104,7 +135,8 @@ kubectl apply -k deploy/kubernetes
 ### 智能体能力
 
 - 🔧 **MCP（Model Context Protocol）**：支持 HTTP / SSE / Stdio / OAuth。可接外部工具服务；每个机器人自己管自己的 MCP 连接。
-- 🌐 **浏览器自动化**：Playwright 驱动无头 Chromium/Firefox，可导航、点击、填表、截屏、读可访问性树、管多标签。
+- 🌐 **Browser Use**：通过 Playwright 驱动 Chromium/Firefox，支持导航、填表、截图、可访问性树和标签页控制。当 headless 模式不够时，可在 workspace 桌面里运行有头浏览器。
+- 🖱️ **Computer Use**：通过视觉状态和输入事件观察并操作机器人的 workspace 桌面，包括点击、输入、滚动，以及处理无法用 headless 方式完成的 GUI 流程。
 - 🎭 **技能、应用超市与子智能体**：用模块化技能描述行为，从应用超市装整理好的技能与 MCP 模板，重活可交给有独立上下文的子智能体。
 - 💭 **会话与讨论模式**：聊天、讨论、定时、心跳、子智能体等会话，可用斜杠命令，并查看会话状态。
 - ⏰ **自动化**：基于 Cron 的定时任务，以及周期心跳，让机器人能自主活动。
@@ -112,10 +144,11 @@ kubectl apply -k deploy/kubernetes
 ### 管理
 
 - 🖥️ **Web 界面**：现代表盘（Vue 3 + Tailwind）——流式聊天、工具调用展示、文件管理、全套可视化配置。深色/浅色、多语言。
+- 💻 **桌面端 App**：面向个人/本地使用的 Memoh 原生客户端，包含自管理本地 server、embedded Qdrant、打包 CLI、本地 workspace 支持，以及系统托盘生命周期控制。
 - 🔐 **访问控制**：基于优先级的 ACL，有预设、允许/拒绝、可按渠道身份、渠道类型或会话作用域配置。
 - 🧪 **多模型**：OpenAI 兼容、Anthropic、Google、OpenAI Codex、GitHub Copilot、Edge TTS 等。可按机器人选模型、提供方 OAuth、自动拉模型列表。
 - 🎙️ **语音与转写**：机器人可经 10+ 家 TTS（Edge、OpenAI、ElevenLabs、Deepgram、Azure、Google、MiniMax、火山、阿里、OpenRouter 等）发声；从 Telegram、Discord 等收到语音会可用 STT（OpenAI / OpenRouter）自动转写，也可用内置工具按需转任意音频。
-- 🚀 **一键部署**：Docker Compose，含自动迁移、containerd 与 CNI 网络。
+- 🚀 **Server Deploy**：面向长期在线服务端使用的 Docker Compose 与 Kubernetes 部署路径，包含自动迁移、容器运行时配置，以及 workspace 容器所需的配套服务。
 
 ## 记忆系统
 

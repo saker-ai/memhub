@@ -36,7 +36,7 @@ Memoh is distributed in two forms:
 
 The self-hosted server stack for always-on, multi-user or multi-tenant usage. Use this when you want Memoh running on a server, VM, NAS, or Kubernetes cluster, with bots available through Web UI and external channels such as Telegram, Discord, Lark, WeChat, Email, and more.
 
-<details open>
+<details>
 <summary><strong>Deploy Memoh Server</strong></summary>
 
 Use the deploy version when Memoh should be reachable by multiple users, run bots continuously, or connect to public/private messaging channels. The default Docker deployment starts the server, Web UI, database migrations, container runtime support, and the services needed for workspace containers.
