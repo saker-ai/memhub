@@ -1,6 +1,6 @@
 # 机器人
 
-机器人是 Memoh 里**独立**的智能体：自带容器、长期记忆、可配性格，并能通过各 **渠道** 对话、用工具做事。
+机器人是 Memoh 里**独立**的智能体：自带 workspace、长期记忆、可配性格，并能通过各 **渠道** 对话、用工具做事。
 
 ## 创建
 
@@ -21,15 +21,18 @@
 
 | Tab | 内容 |
 |-----|------|
-| **Overview** | 容器、库、渠道、记忆等健康检查 |
+| **Overview** | workspace runtime、库、渠道、记忆等健康检查 |
 | **General** | 主模型/标题/生图、记忆/搜索/浏览器/TTS、时区、语言、推理、危险区 |
-| **Container** | 起停、快照、导入导出 |
+| **Container** | 容器型 workspace 起停、快照、导入导出 |
+| **Desktop** | Workspace display runtime、有头浏览器、实时 display session |
+| **Network** | Workspace 网络与 overlay provider 状态/动作 |
+| **Tool Approval** | 需要人类确认的工具审批设置 |
 | **Memory** | 浏览、搜、建、改、压记忆 |
 | **Platforms** | 各消息渠道（Telegram、Discord、飞书等） |
 | **Access** | ACL 与默认通过/拒绝 |
 | **Email** | 邮服绑定、发件箱 |
-| **Terminal** | 进容器 shell |
-| **Files** | 容器内文件管理 |
+| **Terminal** | 进入 workspace runtime 的交互 shell |
+| **Files** | workspace 文件管理 |
 | **MCP** | 连接（Stdio/Remote/OAuth） |
 | **Heartbeat** | 心跳间隔、模型、执行日志 |
 | **Compaction** | 会话压缩设置与记录 |
@@ -114,10 +117,10 @@
 
 ## 终端
 
-**Terminal** tab 开交互 shell，可多 tab；**容器在跑**时才能用。
+**Terminal** tab 开交互 shell，可多 tab；workspace runtime 正在运行时才能用。
 
 ---
 
 ## 删除
 
-**General** 最下 **Danger Zone** → **Delete Bot**，会删掉该机器人相关数据（含容器文件与记忆等），**不可恢复**。
+**General** 最下 **Danger Zone** -> **Delete Bot**，会删掉该机器人相关数据（含 workspace 文件与记忆等），**不可恢复**。

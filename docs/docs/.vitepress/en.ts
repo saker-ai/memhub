@@ -12,7 +12,15 @@ export const en = [
     text: 'Installation',
     items: [
       {
-        text: 'Docker',
+        text: 'Overview',
+        link: '/installation/index.md'
+      },
+      {
+        text: 'Desktop',
+        link: '/installation/desktop.md'
+      },
+      {
+        text: 'Server Deploy',
         link: '/installation/docker.md'
       },
       {
@@ -49,8 +57,12 @@ export const en = [
         link: '/getting-started/access.md'
       },
       {
-        text: 'Container',
+        text: 'Workspace / Container',
         link: '/getting-started/container.md'
+      },
+      {
+        text: 'Browser / Computer Use',
+        link: '/getting-started/browser-computer-use.md'
       },
       {
         text: 'Files',

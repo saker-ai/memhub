@@ -1,6 +1,6 @@
 # Bot Files Management
 
-Every Memoh Bot has its own dedicated filesystem inside its isolated container. You can manage this filesystem directly from the **Files** tab in the Bot Detail page.
+Every Memoh bot has its own workspace filesystem. In server deployments this usually lives inside the bot's container-backed workspace; in trusted desktop/local mode it may be a local workspace directory. You can manage this filesystem directly from the **Files** tab in the bot detail page.
 
 ---
 
@@ -16,10 +16,10 @@ The **FileManager** component provides a familiar file-browsing experience with 
 
 ### Managing Files
 
-- **Upload**: Select files from your local computer to transfer them into the bot's container.
+- **Upload**: Select files from your local computer to transfer them into the bot workspace.
 - **Rename**: Click on a file or folder and use the rename action to update its identifier.
 - **Delete**: Remove files or folders (with recursive support for directories).
-- **Download**: Retrieve a file from the bot's container back to your local machine.
+- **Download**: Retrieve a file from the bot workspace back to your local machine.
 
 ---
 
@@ -31,7 +31,7 @@ The integrated **FileViewer** allows you to interact with the bot's files withou
 
 - **Read/Edit**: Click a text file (e.g., `.md`, `.js`, `.py`, `.toml`) to open it in the built-in **Monaco Editor**.
 - **Syntax Highlighting**: Supports common programming languages and configuration formats.
-- **Save**: Modify the file's content and click **Save** to apply the changes to the bot's filesystem.
+- **Save**: Modify the file's content and click **Save** to apply the changes to the bot workspace filesystem.
 
 ### Images
 

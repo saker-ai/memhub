@@ -1,43 +1,60 @@
-# Bot Container Management
+# Bot Workspace Management
 
-Every Bot in Memoh operates within its own isolated container environment. This isolation ensures security, provides a dedicated filesystem, and allows the bot to execute code or commands without affecting other bots or the host system.
+Every bot in Memoh works inside a workspace. In server deployments this is normally an isolated container, Pod, or VM-like runtime. In trusted desktop/local scenarios it may also be a local host directory. The workspace gives the bot a filesystem, command execution environment, MCP runtime, and optional graphical desktop.
 
-## Concept: The Isolated Workspace
+## Concept: The Bot Workspace
 
-The container acts as the bot's private "computer." Within it, the bot can:
-- Store and modify files
-- Install software via package managers
-- Execute scripts
-- Maintain state across multiple sessions
+The workspace acts as the bot's private computer. Within it, the bot can:
 
----
+- store and modify files
+- install software through package managers when the image allows it
+- execute scripts and background tasks
+- keep state across sessions
+- optionally run a desktop display and headed browser
 
-## Operations
+The underlying runtime is selected globally with `[container].backend` in `config.toml`, with trusted local workspace support controlled separately. The official Docker Compose server deploy uses `containerd`; Docker Engine, Kubernetes, Apple, and local workspace modes are documented in [Workspace Backends](/installation/workspace-backends).
 
-Manage the lifecycle of your bot's environment from the **Container** tab in the Bot Detail page.
+## Workspace tabs
 
-The underlying runtime is selected globally with `[container].backend` in `config.toml`. The official Docker Compose stack uses `containerd`; host Docker, Kubernetes, and Apple backends are also available for manual deployments. See [Workspace backends](/installation/workspace-backends.md) before changing this setting.
+Bot detail pages expose workspace-related settings across several tabs:
 
-### Lifecycle Actions
+| Tab | Purpose |
+|-----|---------|
+| **Container** | Container lifecycle, snapshots, data export/import, and CDI device settings. |
+| **Desktop** | Workspace display runtime, headed browser availability, live display sessions, and session cleanup. |
+| **Network** | Workspace network and overlay provider status/actions. |
+| **Tool Approval** | Approval settings for tools that need explicit human permission. |
+| **Files** | Browse and edit the bot workspace filesystem. |
+| **Terminal** | Open interactive shells inside the active workspace runtime. |
 
-- **Create**: Initialize the container if it doesn't exist (using the configured image). Progress is shown via real-time SSE feedback during image pull and creation.
-- **Start**: Launch the container. The bot must have a running container to perform many operations like file editing or executing tools.
-- **Stop**: Gracefully shut down the container to save resources.
-- **Delete**: Remove the container instance.
+Some tabs are hidden or limited for trusted local workspaces when the feature only applies to container-backed runtimes.
 
----
+## Container lifecycle
 
-## Container Information
+Manage the container-backed workspace from the **Container** tab.
 
-The **Container** tab displays real-time data about the bot's runtime:
-- **Container ID**: Unique identifier for the instance.
-- **Status**: Whether it's currently running, stopped, or creating.
-- **Image**: The container image used as the base.
-- **Paths**: Host and container paths for data persistence.
-- **Tasks**: Number of active background tasks running in the container.
-- **CDI Devices**: The effective GPU CDI devices currently attached to the container, if any.
+- **Create**: Initialize the workspace container if it does not exist. Progress is shown through SSE during image pull and creation.
+- **Start**: Launch the workspace runtime.
+- **Stop**: Gracefully shut down the runtime to save resources.
+- **Delete**: Remove the runtime instance.
 
----
+Many workspace features, such as terminal access and container display, require the runtime to be running.
+
+## Workspace display
+
+The **Desktop** tab prepares and inspects the graphical workspace runtime. It checks for the desktop toolkit, Xvnc/VNC availability, browser availability, and active display sessions.
+
+When enabled, the workspace can run a headed Chrome/Chromium browser inside the container. The Web UI display pane connects to that desktop session so you and the agent can operate the same visible browser. For the tool model, see [Browser / Computer Use](/getting-started/browser-computer-use).
+
+## Container information
+
+The **Container** tab displays runtime data such as:
+
+- container ID and status
+- image
+- host and workspace paths
+- active background tasks
+- effective CDI devices, if configured
 
 ## Advanced: Provide CDI Devices
 
@@ -47,7 +64,7 @@ In the Web UI, this capability is placed under **Advanced options** in the **Con
 
 ### Configure CDI Devices
 
-1. Open the Bot's **Container** tab.
+1. Open the bot's **Container** tab.
 2. Click **Create** if the container does not exist, or recreate the container if you need to change GPU settings.
 3. Expand **Advanced options**.
 4. Enable **GPU**.
@@ -82,56 +99,18 @@ If Memoh reports an error such as `unresolvable CDI devices`, the configured dev
 - The container image still needs the appropriate user-space libraries and tools if you want to run CUDA or ROCm software inside the container.
 - After creation, the **Container** tab shows the effective attached CDI devices for verification.
 
----
-
 ## Snapshots
 
-Snapshots allow you to capture the current state of the bot's container and restore it later. This is useful for:
-- Saving a known good configuration
-- Versioning the bot's environment
-- Testing complex changes safely
-
-### Creating a Snapshot
-1. Ensure the container is stopped or in a stable state.
-2. Click **Create Snapshot**.
-3. Provide a name for the snapshot.
-
-### Restoring a Snapshot
-- Find the desired snapshot in the list and click **Restore**. This will reset the container to the captured state.
-
-### Managing Snapshots
-- View a list of existing snapshots with their creation timestamps and parent relationships.
-- Use the **Delete** button next to a snapshot to remove it.
-
----
+Snapshots allow you to capture the current state of the bot's container workspace and restore it later. This is useful for saving a known good configuration, versioning the runtime, or testing complex changes safely.
 
 ## Data Export and Import
 
-The Container tab supports exporting and importing container data for backup, migration, or sharing purposes.
+The **Container** tab supports exporting and importing workspace data for backup, migration, or sharing purposes.
 
-### Export
+- **Export Data** packages the workspace filesystem data into a downloadable archive.
+- **Import Data** extracts an uploaded archive into the workspace filesystem.
+- **Restore** resets the data directory to a clean state when the filesystem has become corrupted or you want to start fresh without recreating the runtime.
 
-1. Click **Export Data**.
-2. The container's filesystem data is packaged into a downloadable archive.
-3. Save the archive to your local machine.
+## Versioning
 
-### Import
-
-1. Click **Import Data**.
-2. Select an archive file from your local machine.
-3. The archive contents are extracted into the container's filesystem.
-
-### Restore
-
-The **Restore** operation resets the container's data directory to a clean state. This is useful when the filesystem has become corrupted or you want to start fresh without recreating the container.
-
----
-
-## Container Versioning
-
-Memoh tracks container versions to manage the lifecycle of the bot's runtime environment. Version information includes:
-
-- **Current Version**: The active container version.
-- **Version History**: A log of container version changes over time.
-
-This helps with auditing and understanding when container configurations were updated.
+Memoh tracks workspace/container versions to manage the lifecycle of the bot runtime environment. Version information helps with auditing and understanding when runtime configuration changed.

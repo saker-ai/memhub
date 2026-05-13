@@ -1,6 +1,6 @@
 # 文件
 
-每个机器人在容器里有一份**独立盘**。在 **Files** tab 里直接管。
+每个机器人都有自己的 **workspace 文件系统**。Server Deploy 里通常在容器型 workspace 内；trusted Desktop/local 模式下也可能是本地 workspace 目录。在 **Files** tab 里可以直接管理。
 
 ---
 
@@ -16,9 +16,9 @@
 
 ### 文件
 
-- **Upload** 本机文件打进容器
+- **Upload** 本机文件打进 workspace
 - **Rename** / **Delete**（目录可递归删）
-- **Download** 拉回本机
+- **Download** 从 workspace 拉回本机
 
 ---
 
@@ -33,4 +33,4 @@
 
 ## 和机器人
 
-机器人自己也能用技能、MCP 等改这些文件；**Files** 是你**肉眼查看、手改**的入口。
+机器人自己也能用技能、MCP 等改这些文件；**Files** 是你**肉眼查看、手改** workspace 的入口。

@@ -6,7 +6,7 @@ import { zh } from './zh'
 // https://vitepress.vuejs.org/config/app-configs
 export default defineConfig({
   title: 'Memoh Documentation',
-  description: 'Multi-Member, Structured Long-Memory, Containerized AI Agent System.',
+  description: 'Multi-member long-memory AI agent platform with desktop and server deploy modes.',
 
   head: [
     ['link', { rel: 'icon', href: '/logo.svg' }]
@@ -49,7 +49,7 @@ export default defineConfig({
     
     footer: {
       message: 'Published under AGPLv3',
-      copyright: 'Copyright © 2024 Memoh'
+      copyright: 'Copyright © 2024-present Memoh'
     },
     
     search: {

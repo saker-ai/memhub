@@ -2,9 +2,23 @@
 
 ## What Is Memoh?
 
-Memoh is a multi-member, structured long-memory, containerized AI agent platform. You can create multiple AI bots, give each bot its own isolated workspace and long-term memory, and interact with them through Telegram, Discord, Lark (Feishu), QQ, Matrix, Misskey, DingTalk, WeCom, WeChat, WeChat Official Account, Email, or the built-in Web UI.
+Memoh is a multi-member, structured long-memory AI agent platform. You can create multiple AI bots, give each bot its own workspace and long-term memory, and interact with them through Telegram, Discord, Lark (Feishu), QQ, Matrix, Misskey, DingTalk, WeCom, WeChat, WeChat Official Account, Email, or the built-in Web UI.
 
-Every bot has its own execution environment, tools, memory configuration, and channel integrations. In practice, that means each bot behaves more like its own computer-backed agent than a shared chat preset.
+Every bot has its own runtime, tools, memory configuration, channel integrations, and access policy. Depending on deployment mode, that workspace can be an isolated container or a trusted local workspace.
+
+## Distribution Modes
+
+### Desktop
+
+The native desktop client is for personal and local use. It starts a local `memoh-server` on `127.0.0.1:18731`, manages local SQLite storage, starts embedded Qdrant for memory search, bundles the `memoh` CLI, and owns system tray lifecycle behavior.
+
+Desktop is the fastest way to try Memoh on your own machine.
+
+### Server Deploy
+
+Server Deploy is for always-on shared usage. Use it when Memoh should serve multiple users, run continuously on a server, or connect to external channels while your personal computer is offline.
+
+The server stack can run with Docker Compose or Kubernetes and includes the backend, Web UI, database, memory services, and workspace runtime.
 
 ## What Makes Memoh Different
 
@@ -17,9 +31,21 @@ Memoh is built for real sharing and real separation at the same time:
 - distinguish individual users in shared conversations
 - bind identities across channels so the same person can be recognized consistently
 
-### Containerized Workspaces
+### Independent Workspaces
 
-Each bot runs in its own isolated container workspace with a separate filesystem and network boundary. Bots can read and write files, run commands, and use tools inside that workspace without interfering with other bots.
+Each bot can use an independent workspace for files, commands, MCP hosting, and long-running tasks. Server deployments normally use container workspaces through Docker, Kubernetes, containerd, or Apple-backed runtimes. Desktop/local deployments can also use trusted local workspaces when host-level access is intentional.
+
+Container workspaces can provide a full graphical desktop with VNC/RFB transport and a headed Chrome/Chromium browser. This enables workflows that require visible browser state rather than pure headless automation.
+
+### Browser Use And Computer Use
+
+Memoh separates browser and GUI operation into practical layers:
+
+- **Headless browser commands** run as ordinary workspace commands.
+- **Browser Use** operates the headed workspace browser over CDP.
+- **Computer Use** drives the broader workspace desktop through screenshots, pointer input, and keyboard input.
+
+Prefer Browser Use for web pages. Use Computer Use for native dialogs, non-browser apps, or GUI states that CDP cannot reach.
 
 ### Long-Term Memory And Context Management
 
@@ -46,30 +72,15 @@ You can start or route sessions with slash commands such as `/new`, and the Web 
 
 Memoh uses a unified channel adapter system so one bot can be reachable from many places at once.
 
-Current user-facing integrations include:
-
-- **Telegram**
-- **Discord**
-- **Lark (Feishu)**
-- **QQ**
-- **Matrix**
-- **Misskey**
-- **DingTalk**
-- **WeCom**
-- **WeChat**
-- **WeChat Official Account**
-- **Email**
-- **Web**
-
-Memoh also distinguishes between the personal **WeChat** QR-login integration and the webhook-based **WeChat Official Account** integration.
+Current user-facing integrations include Telegram, Discord, Lark (Feishu), QQ, Matrix, Misskey, DingTalk, WeCom, WeChat, WeChat Official Account, Email, and Web.
 
 ### Tools, Skills, MCP, And Supermarket
 
 Bots can use a rich set of built-in capabilities, including:
 
 - web search and web fetch
-- container workspace automation
-- file editing and command execution inside the bot workspace
+- workspace file editing and command execution
+- Browser Use and Computer Use
 - memory search and management
 - messaging, email, and TTS
 - subagents for delegated work
@@ -79,17 +90,9 @@ Bots can use a rich set of built-in capabilities, including:
 
 ### Providers And Models
 
-Memoh supports multiple provider client types, including:
+Memoh supports multiple provider client types, including OpenAI-compatible chat completions, OpenAI Responses API, Anthropic Messages, Google Generative AI, OpenAI Codex, GitHub Copilot, and Edge Speech/TTS.
 
-- OpenAI-compatible chat completions
-- OpenAI Responses API
-- Anthropic Messages
-- Google Generative AI
-- OpenAI Codex
-- GitHub Copilot
-- Edge Speech / TTS
-
-Models are also separated by role:
+Models are separated by role:
 
 - **chat** models for normal interaction
 - **embedding** models for vector memory and search
@@ -99,20 +102,13 @@ Image generation is configured through compatible chat/image models rather than 
 
 ### Operations And UI
 
-The Web UI is designed so you can manage the whole system without editing config files by hand every day. It includes:
-
-- bot configuration tabs for general settings, access, channels, heartbeat, compaction, and more
-- provider and model management with OAuth flows where supported
-- session-side controls such as immediate compaction and status inspection
-- skill management with effective / shadowed / disabled visibility
-- slash-command driven control from channels
+The Web UI is designed so you can manage the whole system without editing config files by hand every day. It includes bot configuration tabs, provider/model management, session controls, workspace files, terminal and display panes, skill management, and slash-command control from channels.
 
 ## Where To Start
 
-- **[Docker Installation](/installation/docker)** — get the stack running
+- **[Installation Overview](/installation/)** — choose Desktop or Server Deploy
 - **[Providers And Models](/getting-started/provider-and-model)** — configure model access
 - **[Bot Setup](/getting-started/bot)** — create and configure a bot
-- **[Sessions](/getting-started/sessions)** — understand chat vs discuss behavior
+- **[Browser / Computer Use](/getting-started/browser-computer-use)** — understand headed browser and desktop automation
 - **[Channels](/getting-started/channels)** — choose where bots are reachable
 - **[Skills](/getting-started/skills)** and **[Supermarket](/getting-started/supermarket)** — extend what bots can do
-- **[Slash Commands](/getting-started/slash-commands)** — operate bots directly from chat

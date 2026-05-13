@@ -106,7 +106,7 @@ In `/help` output, owner-only actions are marked with `[owner]`.
 | `/email` | Inspect email providers, bindings, and outbox | None |
 | `/heartbeat` | View recent heartbeat logs | `logs` |
 | `/skill` | View loaded bot skills | `list` |
-| `/fs` | Browse files inside the bot container | None |
+| `/fs` | Browse files inside the bot workspace | None |
 | `/status` | Inspect session message/context/cache status | `show` |
 | `/access` | Inspect identity, role, and ACL context | `show` |
 | `/compact` | Trigger immediate session context compaction | `run` |
@@ -351,7 +351,7 @@ Actions:
 
 ### `/fs`
 
-Browses the bot container filesystem.
+Browses the bot workspace filesystem.
 
 Actions:
 

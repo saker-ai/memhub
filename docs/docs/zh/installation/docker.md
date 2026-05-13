@@ -1,6 +1,10 @@
-# Docker 安装
+# Server Deploy
 
-推荐用 Docker 跑 Memoh。默认编排里包含 PostgreSQL、主服务（显式配置 workspace backend、智能体也在同一进程）和网页前端。单机轻量部署也可以用 SQLite，见 [SQLite 部署](/zh/installation/sqlite.md)。
+Server Deploy 是 Memoh 的自托管服务端部署形态，适合长期在线、多人、多租户、远程访问，或需要机器人在桌面离线时继续服务外部渠道的场景。
+
+本页保留历史路径 `/zh/installation/docker`，但内容说明的是 Docker Compose 版 Server Deploy。要安装本地原生客户端，请看 [Desktop 桌面版](/zh/installation/desktop)。
+
+默认编排里包含 PostgreSQL、主服务（显式配置 workspace backend，智能体也在同一进程）和网页前端。单机轻量 server 部署也可以用 SQLite，见 [SQLite 部署](/zh/installation/sqlite.md)。
 
 官方 Compose 栈使用 `containerd` workspace backend。server 镜像会启动内置 containerd，并挂好机器人 workspace 需要的 runtime 文件。Docker Engine、Kubernetes 和 Apple 后端见 [Workspace backend](/zh/installation/workspace-backends.md)。
 
@@ -48,7 +52,7 @@ docker compose --profile qdrant --profile sparse up -d
 - [Docker Compose v2](https://docs.docker.com/compose/install/)
 - Git
 
-## 一键安装（推荐）
+## 一键 Server Deploy（推荐）
 
 官方脚本（本机已装好 Docker 与 Compose）：
 
@@ -60,7 +64,7 @@ curl -fsSL https://memoh.sh | sh
 需要提权，脚本会只对 `docker` 命令使用 `sudo`。如果确实要以 root
 运行整个安装脚本，需要显式设置 `MEMOH_ALLOW_ROOT_INSTALL=true`。
 
-脚本会：检查 Docker/Compose；交互问配置（工作区、数据目录、管理员、JWT、数据库后端、Postgres 密码、workspace backend 提示、是否开 sparse、浏览器核等）；从 GitHub 取最新发布并克隆；按 Docker 模板生成 `config.toml`；按数据库后端选择 compose 文件；钉死镜像版本；按选的浏览器核拉齐服务。
+脚本会：检查 Docker/Compose；判断首次安装、升级或重装；交互问配置（工作区、数据目录、管理员、JWT、数据库后端、Postgres 密码、workspace backend 提示、是否开 sparse）；从 GitHub 取最新发布并克隆；按 Docker 模板生成 `config.toml`；按数据库后端选择 compose 文件；钉死镜像版本；启动服务；启动失败时打印数据库、迁移和 server 的近期日志。
 
 **静默安装**（全默认、无提问）：
 
@@ -85,13 +89,13 @@ curl -fsSL https://memoh.sh | sh -s -- --database-driver sqlite
 **指定版本：**
 
 ```bash
-curl -fsSL https://memoh.sh | sh -s -- --version v0.6.0
+curl -fsSL https://memoh.sh | sh -s -- --version v0.9.0
 ```
 
 或：
 
 ```bash
-curl -fsSL https://memoh.sh | MEMOH_VERSION=v0.6.0 sh
+curl -fsSL https://memoh.sh | MEMOH_VERSION=v0.9.0 sh
 ```
 
 **大陆镜像**（拉镜像慢时）：
@@ -100,7 +104,7 @@ curl -fsSL https://memoh.sh | MEMOH_VERSION=v0.6.0 sh
 curl -fsSL https://memoh.sh | USE_CN_MIRROR=true sh
 ```
 
-> 环境变量可组合，例如 `MEMOH_VERSION=v0.6.0 USE_CN_MIRROR=true`。
+> 环境变量可组合，例如 `MEMOH_VERSION=v0.9.0 USE_CN_MIRROR=true`。
 
 ## 手动安装
 
@@ -118,13 +122,13 @@ cp conf/app.docker.toml config.toml
 
 如果用 SQLite，把 `database.driver` 改成 `"sqlite"`，并使用 `docker-compose.sqlite.yml`。详细步骤见 [SQLite 部署](/zh/installation/sqlite.md)。
 
-然后（推荐开 Qdrant、浏览器、sparse）：
+然后（推荐开 Qdrant 和 sparse）：
 
 ```bash
 POSTGRES_PASSWORD=你的库密码 docker compose --profile qdrant --profile sparse up -d
 ```
 
-只跑核心（无向量、无浏览器）：
+只跑核心（无向量、无 sparse）：
 
 ```bash
 POSTGRES_PASSWORD=你的库密码 docker compose up -d

@@ -1,6 +1,6 @@
 # Bot Management
 
-A Bot is an independent AI agent that comes with its own isolated container, persistent memory, and configurable personality. Bots can chat via various messaging platforms (Channels) and perform complex tasks using specialized tools.
+A Bot is an independent AI agent that comes with its own workspace, persistent memory, and configurable personality. Bots can chat via various messaging platforms (Channels) and perform complex tasks using specialized tools.
 
 ## Creating a Bot
 
@@ -23,15 +23,18 @@ Once created, clicking on a bot card takes you to its **Detail Page**, where you
 
 | Tab | Description |
 |-----|-------------|
-| **Overview** | Health checks for container, database, channels, and memory. |
+| **Overview** | Health checks for workspace runtime, database, channels, and memory. |
 | **General** | Core runtime settings: chat/title/image models, memory/search/TTS bindings, timezone, language, reasoning, and danger zone. |
-| **Container** | Container lifecycle (create/start/stop), snapshots, data export/import. |
+| **Container** | Container-backed workspace lifecycle, snapshots, data export/import. |
+| **Desktop** | Workspace display runtime, headed browser availability, and active display sessions. |
+| **Network** | Workspace network and overlay provider status/actions. |
+| **Tool Approval** | Human approval settings for tools that require confirmation. |
 | **Memory** | Browse, search, create, edit, and compact memories. |
 | **Platforms** | Channel configurations such as Telegram, Discord, Feishu, QQ, Matrix, WeCom, WeChat, Misskey, DingTalk, and Web. |
 | **Access** | ACL rules and default access behavior. |
 | **Email** | Email bindings and outbox. |
-| **Terminal** | Interactive terminal access to the bot's container. |
-| **Files** | File manager for the bot's container filesystem. |
+| **Terminal** | Interactive terminal access to the bot workspace runtime. |
+| **Files** | File manager for the bot workspace filesystem. |
 | **MCP** | MCP connection management (Stdio, Remote, OAuth). |
 | **Heartbeat** | Heartbeat configuration, model selection, and execution logs. |
 | **Compaction** | Session context compaction settings and logs. |
@@ -138,17 +141,17 @@ If you manage bot settings through the API or custom automation, the settings sc
 
 ## Terminal Tab
 
-The **Terminal** tab provides interactive shell access to the bot's container:
+The **Terminal** tab provides interactive shell access to the bot's workspace runtime:
 
 - Open multiple terminal tabs simultaneously.
-- Execute commands directly inside the container.
-- Requires the container to be running.
+- Execute commands directly inside the workspace.
+- Requires the workspace runtime to be running.
 
 ---
 
 ## Deleting a Bot
 
-To permanently remove a bot and all its associated data (including container files and memory):
+To permanently remove a bot and all its associated data (including workspace files and memory):
 1. Navigate to the **General** tab in the Bot Detail page.
 2. Scroll to the **Danger Zone** at the bottom.
 3. Click **Delete Bot** and confirm the action.

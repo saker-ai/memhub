@@ -1,6 +1,10 @@
-# Docker Installation
+# Server Deploy
 
-Docker is the recommended way to run Memoh. The default stack includes PostgreSQL, the main server (with an explicit workspace backend and in-process AI agent), and the web UI, all orchestrated via Docker Compose. SQLite is also available for single-node installs; see [SQLite deployment](/installation/sqlite.md).
+Server Deploy is the self-hosted Memoh stack for always-on, multi-user or multi-tenant usage. Use it when Memoh should run on a server, VM, NAS, or Kubernetes cluster, or when bots need to keep serving external channels while your desktop is offline.
+
+This page keeps the historical `/installation/docker` path, but it documents the Docker Compose server deployment. For the native local client, see [Desktop Installation](/installation/desktop).
+
+The default Compose stack includes PostgreSQL, the main server with an explicit workspace backend and in-process AI agent, and the web UI. SQLite is also available for single-node server installs; see [SQLite deployment](/installation/sqlite.md).
 
 The official Compose stack uses the `containerd` workspace backend. The server image starts an embedded containerd and mounts the runtime files needed by bot workspaces. For Docker Engine, Kubernetes, and Apple backends, see [Workspace backends](/installation/workspace-backends.md).
 
@@ -48,7 +52,7 @@ For more details on memory modes, see [Built-in Memory Provider](/memory-provide
 - [Docker Compose v2](https://docs.docker.com/compose/install/)
 - Git
 
-## One-Click Install (Recommended)
+## One-Click Server Deploy (Recommended)
 
 Run the official install script (requires Docker and Docker Compose):
 
@@ -107,13 +111,13 @@ curl -fsSL https://memoh.sh | sh -s -- --install-mode reinstall
 **Install a specific version:**
 
 ```bash
-curl -fsSL https://memoh.sh | sh -s -- --version v0.6.0
+curl -fsSL https://memoh.sh | sh -s -- --version v0.9.0
 ```
 
 Or using the environment variable:
 
 ```bash
-curl -fsSL https://memoh.sh | MEMOH_VERSION=v0.6.0 sh
+curl -fsSL https://memoh.sh | MEMOH_VERSION=v0.9.0 sh
 ```
 
 **Use China mainland mirror** (for slow image pulls):
@@ -122,7 +126,7 @@ curl -fsSL https://memoh.sh | MEMOH_VERSION=v0.6.0 sh
 curl -fsSL https://memoh.sh | USE_CN_MIRROR=true sh
 ```
 
-> Environment variables can be combined, e.g. `curl -fsSL https://memoh.sh | MEMOH_VERSION=v0.6.0 USE_CN_MIRROR=true sh`
+> Environment variables can be combined, e.g. `curl -fsSL https://memoh.sh | MEMOH_VERSION=v0.9.0 USE_CN_MIRROR=true sh`
 
 **Use SQLite instead of PostgreSQL** (single-node installs):
 
