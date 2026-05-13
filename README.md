@@ -94,7 +94,7 @@ The native client for personal/local use. It starts and manages a local Memoh se
 
 Use the desktop version when you want a local app that manages Memoh for you. It is designed for single-user desktop workflows, local memory, and local/Docker-backed workspaces. The desktop app runs its own local server, so it is separate from the deploy version above.
 
-1. Download the installer for your platform from the [GitHub Releases](https://github.com/memohai/Memoh/releases) page.
+1. Download the installer for your platform from the [Memoh Desktop download page](https://memoh.ai/desktop).
 2. Open Memoh. The app starts the local server, prepares local storage, and connects the UI automatically.
 3. Optional: install the bundled `memoh` CLI from the app menu if you want terminal access to the same local server.
 

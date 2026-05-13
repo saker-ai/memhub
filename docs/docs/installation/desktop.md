@@ -16,7 +16,7 @@ Choose [Server Deploy](/installation/docker) instead when you need shared access
 
 ## Install
 
-1. Download the installer for your platform from [GitHub Releases](https://github.com/memohai/Memoh/releases).
+1. Download the installer for your platform from the [Memoh Desktop download page](https://memoh.ai/desktop).
 2. Open Memoh.
 3. Let the app start its local server and initialize storage.
 4. Optional: use the app menu to install the bundled `memoh` CLI.

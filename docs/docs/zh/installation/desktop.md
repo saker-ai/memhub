@@ -16,7 +16,7 @@ Memoh Desktop 是面向个人和本地使用的原生客户端。它和 Server D
 
 ## 安装
 
-1. 从 [GitHub Releases](https://github.com/memohai/Memoh/releases) 下载对应平台安装包。
+1. 从 [Memoh Desktop 下载页](https://memoh.ai/desktop) 下载对应平台安装包。
 2. 打开 Memoh。
 3. 等 App 启动本地服务并初始化存储。
 4. 可选：在 App 菜单里安装 bundled `memoh` CLI。

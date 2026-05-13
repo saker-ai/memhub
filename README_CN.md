@@ -92,7 +92,7 @@ kubectl apply -k deploy/kubernetes
 
 当你希望有一个本地 App 代管 Memoh 时，请使用 desktop 版本。它面向单用户桌面工作流、本地记忆，以及 local/Docker-backed workspace。桌面端会运行自己的本地 server，因此和上面的 deploy 版本是两条不同形态。
 
-1. 从 [GitHub Releases](https://github.com/memohai/Memoh/releases) 下载对应平台安装包。
+1. 从 [Memoh Desktop 下载页](https://memoh.ai/desktop) 下载对应平台安装包。
 2. 打开 Memoh。App 会启动本地 server、准备本地存储，并自动连接界面。
 3. 可选：如果需要在终端访问同一个本地 server，可从 App 菜单安装打包好的 `memoh` CLI。
 
