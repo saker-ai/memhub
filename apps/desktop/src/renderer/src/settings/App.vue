@@ -18,6 +18,10 @@ provide(DesktopShellKey, true)
 useSettingsStore()
 
 const route = useRoute()
+const isMacDesktopShell = computed(() =>
+  typeof navigator !== 'undefined'
+  && navigator.platform.toLowerCase().includes('mac'),
+)
 
 // Fetch bot data in the layout to ensure reactive breadcrumb updates for bot-detail
 const { data: bot } = useQuery({
@@ -78,8 +82,9 @@ const breadcrumbs = computed(() => {
          left half is visually unchanged (still `bg-sidebar` 36px);
          the right half gains a thin transparent grab zone. macOS
          only by intent — on Windows / Linux the native title bar
-         handles dragging and this layer is harmless. -->
+         handles dragging. -->
     <div
+      v-if="isMacDesktopShell"
       class="fixed top-0 left-0 right-0 h-4 z-10 [-webkit-app-region:drag]"
       aria-hidden="true"
     />

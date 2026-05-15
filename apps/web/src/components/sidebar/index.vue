@@ -1,7 +1,7 @@
 <template>
   <aside class="relative h-full">
     <header
-      v-if="topInset"
+      v-if="macTopInset"
       class="fixed top-0 left-0 z-20 h-9 w-(--sidebar-width) flex items-center pl-[78px] pr-2 gap-1 bg-sidebar border-r border-sidebar-border [-webkit-app-region:drag]"
     >
       <div class="ml-auto flex items-center gap-1 [-webkit-app-region:no-drag]">
@@ -18,11 +18,11 @@
     </header>
 
     <Sidebar
-      :collapsible="topInset ? 'none' : 'icon'"
-      :class="topInset ? 'pt-9 h-dvh border-r border-sidebar-border' : ''"
+      :collapsible="desktopShell ? 'none' : 'icon'"
+      :class="macTopInset ? 'pt-9 h-dvh border-r border-sidebar-border' : desktopShell ? 'h-dvh border-r border-sidebar-border' : ''"
     >
       <SidebarHeader
-        v-if="!topInset"
+        v-if="!desktopShell"
         class="p-0 border-0"
       >
         <div class="h-10 flex items-center pl-2 group-data-[collapsible=icon]:pl-3 transition-[padding] duration-200 ease-linear">
@@ -100,7 +100,7 @@
         </SidebarMenu>
       </SidebarFooter>
 
-      <SidebarRail v-if="!topInset" />
+      <SidebarRail v-if="!desktopShell" />
     </Sidebar>
   </aside>
 </template>
@@ -135,7 +135,12 @@ const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 const { toggleSidebar } = useSidebar()
-const topInset = inject(DesktopShellKey, false)
+const desktopShell = inject(DesktopShellKey, false)
+const macTopInset = computed(() =>
+  desktopShell
+  && typeof navigator !== 'undefined'
+  && navigator.platform.toLowerCase().includes('mac'),
+)
 const { sortBots } = usePinnedBots()
 
 const { data: botData, isLoading } = useQuery(getBotsQuery())
