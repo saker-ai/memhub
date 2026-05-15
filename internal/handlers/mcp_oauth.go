@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -41,6 +42,8 @@ func (h *MCPOAuthHandler) Register(e *echo.Echo) {
 	group.GET("/status", h.Status)
 	group.DELETE("/token", h.RevokeToken)
 	group.POST("/exchange", h.Exchange)
+	e.GET("/oauth/mcp/callback", h.Callback)
+	e.GET("/api/oauth/mcp/callback", h.Callback)
 }
 
 type oauthDiscoverRequest struct {
@@ -180,6 +183,43 @@ func (h *MCPOAuthHandler) Exchange(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]bool{"success": true})
 }
 
+// Callback godoc
+// @Summary OAuth callback for MCP connections
+// @Description Exchanges the authorization code and renders a small completion page
+// @Tags mcp
+// @Param code query string false "Authorization code"
+// @Param state query string false "State parameter"
+// @Param error query string false "OAuth error"
+// @Param error_description query string false "OAuth error description"
+// @Success 200 {string} string "HTML result page"
+// @Failure 400 {string} string "HTML error page"
+// @Router /oauth/mcp/callback [get].
+func (h *MCPOAuthHandler) Callback(c echo.Context) error {
+	if errorParam := strings.TrimSpace(c.QueryParam("error")); errorParam != "" {
+		errorDesc := strings.TrimSpace(c.QueryParam("error_description"))
+		message := errorParam
+		if errorDesc != "" {
+			message += ": " + errorDesc
+		}
+		return renderMCPOAuthCallbackResult(c, http.StatusBadRequest, "error", message)
+	}
+
+	code := strings.TrimSpace(c.QueryParam("code"))
+	state := strings.TrimSpace(c.QueryParam("state"))
+	if code == "" {
+		return renderMCPOAuthCallbackResult(c, http.StatusBadRequest, "error", "code is required")
+	}
+	if state == "" {
+		return renderMCPOAuthCallbackResult(c, http.StatusBadRequest, "error", "state is required")
+	}
+
+	if _, err := h.oauthService.HandleCallback(c.Request().Context(), state, code); err != nil {
+		h.logger.Warn("oauth callback failed", slog.Any("error", err))
+		return renderMCPOAuthCallbackResult(c, http.StatusBadRequest, "error", err.Error())
+	}
+	return renderMCPOAuthCallbackResult(c, http.StatusOK, "success", "")
+}
+
 // Status godoc
 // @Summary Get OAuth status for MCP connection
 // @Description Returns the current OAuth status including whether tokens are available
@@ -246,4 +286,26 @@ func (*MCPOAuthHandler) requireChannelIdentityID(c echo.Context) (string, error)
 
 func (h *MCPOAuthHandler) authorizeBotAccess(ctx context.Context, channelIdentityID, botID string) (bots.Bot, error) {
 	return AuthorizeBotAccess(ctx, h.botService, h.accountService, channelIdentityID, botID)
+}
+
+func renderMCPOAuthCallbackResult(c echo.Context, status int, result string, message string) error {
+	page := template.Must(template.New("mcp-oauth-result").Parse(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>MCP OAuth</title>
+  </head>
+  <body style="font-family: sans-serif; padding: 24px;">
+    <h2>{{if eq .Result "success"}}MCP server connected{{else}}MCP authorization failed{{end}}</h2>
+    {{if .Message}}<p>{{.Message}}</p>{{else}}<p>You can close this window and return to Memoh.</p>{{end}}
+    <script>
+      window.opener?.postMessage({ type: "mcp-oauth-callback", status: "{{.Result}}", error: "{{.Message}}" }, "*");
+      if (window.opener) window.close();
+    </script>
+  </body>
+</html>`))
+	return c.HTML(status, executeHTMLTemplate(page, map[string]string{
+		"Result":  result,
+		"Message": message,
+	}))
 }

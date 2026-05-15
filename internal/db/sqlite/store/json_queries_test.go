@@ -147,6 +147,93 @@ CREATE TABLE bot_history_messages (
 	}
 }
 
+func TestSQLiteMCPOAuthScopesSupportedRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	conn, err := db.OpenSQLite(ctx, config.SQLiteConfig{DSN: ":memory:"})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	execAll(t, conn, `
+CREATE TABLE mcp_connections (
+  id TEXT PRIMARY KEY
+);
+CREATE TABLE mcp_oauth_tokens (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL UNIQUE REFERENCES mcp_connections(id) ON DELETE CASCADE,
+  resource_metadata_url TEXT NOT NULL DEFAULT '',
+  authorization_server_url TEXT NOT NULL DEFAULT '',
+  authorization_endpoint TEXT NOT NULL DEFAULT '',
+  token_endpoint TEXT NOT NULL DEFAULT '',
+  registration_endpoint TEXT NOT NULL DEFAULT '',
+  scopes_supported TEXT NOT NULL DEFAULT '{}',
+  client_id TEXT NOT NULL DEFAULT '',
+  client_secret TEXT NOT NULL DEFAULT '',
+  access_token TEXT NOT NULL DEFAULT '',
+  refresh_token TEXT NOT NULL DEFAULT '',
+  token_type TEXT NOT NULL DEFAULT 'Bearer',
+  expires_at TEXT,
+  scope TEXT NOT NULL DEFAULT '',
+  pkce_code_verifier TEXT NOT NULL DEFAULT '',
+  state_param TEXT NOT NULL DEFAULT '',
+  resource_uri TEXT NOT NULL DEFAULT '',
+  redirect_uri TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+`)
+
+	connectionID := "00000000-0000-0000-0000-000000000101"
+	if _, err := conn.ExecContext(ctx, `INSERT INTO mcp_connections (id) VALUES (?)`, connectionID); err != nil {
+		t.Fatalf("insert connection: %v", err)
+	}
+
+	store, err := New(conn)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	q := NewQueries(store)
+
+	created, err := q.UpsertMCPOAuthDiscovery(ctx, pgsqlc.UpsertMCPOAuthDiscoveryParams{ //nolint:gosec // Test OAuth URLs are not credentials.
+		ConnectionID:           mustUUID(t, connectionID),
+		ResourceMetadataUrl:    "https://example.test/.well-known/oauth-protected-resource",
+		AuthorizationServerUrl: "https://auth.example.test",
+		AuthorizationEndpoint:  "https://auth.example.test/authorize",
+		TokenEndpoint:          "https://auth.example.test/token",
+		RegistrationEndpoint:   "https://auth.example.test/register",
+		ScopesSupported:        []string{"openid", "profile"},
+		ResourceUri:            "https://example.test/mcp",
+	})
+	if err != nil {
+		t.Fatalf("upsert oauth discovery: %v", err)
+	}
+	assertScopes(t, created.ScopesSupported, []string{"openid", "profile"})
+
+	var storedScopes string
+	if err := conn.QueryRowContext(ctx, `SELECT scopes_supported FROM mcp_oauth_tokens WHERE connection_id = ?`, connectionID).Scan(&storedScopes); err != nil {
+		t.Fatalf("read stored scopes: %v", err)
+	}
+	if storedScopes != `["openid","profile"]` {
+		t.Fatalf("stored scopes = %q, want JSON array", storedScopes)
+	}
+
+	loaded, err := q.GetMCPOAuthToken(ctx, mustUUID(t, connectionID))
+	if err != nil {
+		t.Fatalf("get oauth token: %v", err)
+	}
+	assertScopes(t, loaded.ScopesSupported, []string{"openid", "profile"})
+
+	if _, err := conn.ExecContext(ctx, `UPDATE mcp_oauth_tokens SET scopes_supported = ? WHERE connection_id = ?`, "[email offline_access]", connectionID); err != nil {
+		t.Fatalf("write legacy scopes: %v", err)
+	}
+	legacy, err := q.GetMCPOAuthToken(ctx, mustUUID(t, connectionID))
+	if err != nil {
+		t.Fatalf("get legacy oauth token: %v", err)
+	}
+	assertScopes(t, legacy.ScopesSupported, []string{"email", "offline_access"})
+}
+
 func execAll(t *testing.T, db *sql.DB, statement string) {
 	t.Helper()
 	if _, err := db.ExecContext(context.Background(), statement); err != nil {
@@ -161,4 +248,16 @@ func mustUUID(t *testing.T, value string) pgtype.UUID {
 		t.Fatalf("scan uuid: %v", err)
 	}
 	return id
+}
+
+func assertScopes(t *testing.T, got []string, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("scopes = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("scopes = %#v, want %#v", got, want)
+		}
+	}
 }

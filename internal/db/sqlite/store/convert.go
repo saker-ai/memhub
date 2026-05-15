@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -104,6 +105,9 @@ func assignValue(src reflect.Value, dst reflect.Value) error {
 			dst.SetBytes([]byte(stringValue(src)))
 			return nil
 		}
+		if src.Kind() == reflect.String {
+			return assignSliceFromString(src.String(), dst)
+		}
 		if src.Kind() != reflect.Slice {
 			return fmt.Errorf("cannot assign %s to slice %s", src.Type(), dst.Type())
 		}
@@ -121,6 +125,38 @@ func assignValue(src reflect.Value, dst reflect.Value) error {
 		return assignStruct(src, dst)
 	}
 	return fmt.Errorf("cannot assign %s to %s", src.Type(), dst.Type())
+}
+
+func assignSliceFromString(raw string, dst reflect.Value) error {
+	value := strings.TrimSpace(raw)
+	if value == "" || value == "{}" {
+		dst.Set(reflect.MakeSlice(dst.Type(), 0, 0))
+		return nil
+	}
+	target := reflect.New(dst.Type())
+	if err := json.Unmarshal([]byte(value), target.Interface()); err == nil {
+		dst.Set(target.Elem())
+		return nil
+	}
+	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+		inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(value, "["), "]"))
+		if inner == "" {
+			dst.Set(reflect.MakeSlice(dst.Type(), 0, 0))
+			return nil
+		}
+		parts := strings.Fields(inner)
+		items := reflect.MakeSlice(dst.Type(), 0, len(parts))
+		for _, part := range parts {
+			item := reflect.New(dst.Type().Elem()).Elem()
+			if err := assignValue(reflect.ValueOf(part), item); err != nil {
+				return err
+			}
+			items = reflect.Append(items, item)
+		}
+		dst.Set(items)
+		return nil
+	}
+	return fmt.Errorf("cannot assign string %q to slice %s", raw, dst.Type())
 }
 
 func assignStruct(src reflect.Value, dst reflect.Value) error {
@@ -242,6 +278,9 @@ func stringValue(value reflect.Value) string {
 	case reflect.Slice:
 		if value.Type().Elem().Kind() == reflect.Uint8 {
 			return string(value.Bytes())
+		}
+		if encoded, err := json.Marshal(value.Interface()); err == nil {
+			return string(encoded)
 		}
 	case reflect.Bool:
 		if value.Bool() {

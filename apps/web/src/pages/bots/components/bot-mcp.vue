@@ -1000,6 +1000,7 @@ import {
   postBotsByBotIdMcpByIdProbe, putBotsByBotIdMcpImport, getBotsByBotIdMcpByIdOauthStatus,
   postBotsByBotIdMcpByIdOauthDiscover, postBotsByBotIdMcpByIdOauthAuthorize, deleteBotsByBotIdMcpByIdOauthToken,
 } from '@memohai/sdk'
+import { client } from '@memohai/sdk/client'
 import type {
   McpUpsertRequest, McpImportRequest, McpToolDescriptor, McpMcpServerEntry, McpOAuthStatus,
 } from '@memohai/sdk'
@@ -1521,12 +1522,22 @@ function handleExportSingle() {
 }
 
 // OAuth Handlers
+function mcpOAuthCallbackUrl() {
+  const rawBase = String(client.getConfig().baseUrl || '/api')
+  const base = new URL(rawBase, window.location.origin)
+  const basePath = base.pathname.replace(/\/+$/, '')
+  base.pathname = `${basePath}/oauth/mcp/callback`
+  base.search = ''
+  base.hash = ''
+  return base.toString()
+}
+
 async function loadOAuthStatus(item: McpItem) {
   if (!item.id || item.type === 'stdio') { oauthStatus.value = null; return }
   try {
     const { data } = await getBotsByBotIdMcpByIdOauthStatus({ path: { bot_id: props.botId, id: item.id } as unknown as { bot_id: string, id: string }, throwOnError: true })
     oauthStatus.value = data ?? null
-    oauthCallbackUrl.value = `${window.location.origin}/oauth/mcp/callback`
+    oauthCallbackUrl.value = mcpOAuthCallbackUrl()
   } catch { oauthStatus.value = null }
 }
 
@@ -1562,36 +1573,59 @@ async function handleOAuthFlow() {
       body: {
         client_id: oauthClientId.value.trim() || undefined,
         client_secret: oauthClientSecret.value.trim() || undefined,
-        callback_url: `${window.location.origin}/oauth/mcp/callback`,
+        callback_url: mcpOAuthCallbackUrl(),
       },
       throwOnError: true,
     })
     if (!data?.authorization_url) throw new Error('No authorization URL returned')
     
     const popup = window.open(data.authorization_url, 'mcp-oauth', 'width=600,height=700')
+    let completed = false
+    let pollTimer: ReturnType<typeof setInterval> | undefined
+    const finishOAuth = async (status: 'success' | 'error', error?: string) => {
+      if (completed) return
+      completed = true
+      if (pollTimer) clearInterval(pollTimer)
+      window.removeEventListener('message', onMessage)
+      oauthAuthorizing.value = false
+      if (status === 'success') {
+        toast.success(t('mcp.oauth.authSuccess'))
+        await loadOAuthStatus(selectedItem.value!)
+        handleProbe(selectedItem.value!)
+      } else {
+        toast.error(error || t('mcp.oauth.authFailed'))
+        await loadOAuthStatus(selectedItem.value!)
+      }
+    }
     const onMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'mcp-oauth-callback') {
-        window.removeEventListener('message', onMessage)
-        oauthAuthorizing.value = false
-        if (event.data.status === 'success') {
-          toast.success(t('mcp.oauth.authSuccess'))
-          await loadOAuthStatus(selectedItem.value!)
-          handleProbe(selectedItem.value!)
-        } else {
-          toast.error(event.data.error || t('mcp.oauth.authFailed'))
-        }
+        await finishOAuth(event.data.status === 'success' ? 'success' : 'error', event.data.error)
       }
     }
     window.addEventListener('message', onMessage)
 
-    const pollTimer = setInterval(() => {
-      if (popup && popup.closed) {
-        clearInterval(pollTimer)
-        window.removeEventListener('message', onMessage)
-        oauthAuthorizing.value = false
-        loadOAuthStatus(selectedItem.value!)
-      }
-    }, 500)
+    const startedAt = Date.now()
+    pollTimer = setInterval(() => {
+      if (completed || !selectedItem.value?.id) return
+      getBotsByBotIdMcpByIdOauthStatus({
+        path: { bot_id: props.botId, id: selectedItem.value.id } as unknown as { bot_id: string, id: string },
+        throwOnError: true,
+      }).then(async ({ data: status }) => {
+        if (completed) return
+        if (status?.configured) {
+          oauthStatus.value = status
+          await finishOAuth('success')
+          return
+        }
+        if (popup?.closed || Date.now() - startedAt > 120_000) {
+          await finishOAuth('error')
+        }
+      }).catch(() => {
+        if (!completed && (popup?.closed || Date.now() - startedAt > 120_000)) {
+          void finishOAuth('error')
+        }
+      })
+    }, 2000)
   } catch (error) {
     toast.error(resolveApiErrorMessage(error, t('mcp.oauth.flowInitFailed')))
     oauthAuthorizing.value = false

@@ -22,3 +22,13 @@ func TestShouldSkipJWT_ChannelWebhookPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestShouldSkipJWT_MCPOAuthCallbackPaths(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{"/oauth/mcp/callback", "/api/oauth/mcp/callback"} {
+		if !shouldSkipJWT(path) {
+			t.Fatalf("path=%q should skip jwt", path)
+		}
+	}
+}
