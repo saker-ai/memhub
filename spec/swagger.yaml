@@ -1579,12 +1579,33 @@ definitions:
       message:
         type: string
     type: object
+  handlers.FSArchiveRequest:
+    properties:
+      paths:
+        items:
+          type: string
+        type: array
+    type: object
   handlers.FSDeleteRequest:
     properties:
       path:
         type: string
       recursive:
         type: boolean
+    type: object
+  handlers.FSExtractRequest:
+    properties:
+      path:
+        type: string
+    type: object
+  handlers.FSExtractResponse:
+    properties:
+      destination:
+        type: string
+      directories:
+        type: integer
+      files:
+        type: integer
     type: object
   handlers.FSFileInfo:
     properties:
@@ -3935,6 +3956,48 @@ paths:
       summary: Get file or directory info
       tags:
       - containerd
+  /bots/{bot_id}/container/fs/archive:
+    post:
+      description: Downloads selected files/directories from the workspace as a tar.gz
+        archive
+      parameters:
+      - description: Bot ID
+        in: path
+        name: bot_id
+        required: true
+        type: string
+      - description: Archive request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.FSArchiveRequest'
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Download files and directories as tar.gz
+      tags:
+      - containerd
   /bots/{bot_id}/container/fs/delete:
     post:
       description: Deletes a file or directory at the given container path
@@ -4008,6 +4071,50 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: Download a file as binary stream
+      tags:
+      - containerd
+  /bots/{bot_id}/container/fs/extract:
+    post:
+      description: Extracts a .zip, .tar.gz, or .tgz file into a sibling directory
+        named after the archive
+      parameters:
+      - description: Bot ID
+        in: path
+        name: bot_id
+        required: true
+        type: string
+      - description: Extract request
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.FSExtractRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.FSExtractResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Extract an archive file
       tags:
       - containerd
   /bots/{bot_id}/container/fs/list:
@@ -7953,6 +8060,39 @@ paths:
       summary: Update model by model ID
       tags:
       - models
+  /oauth/mcp/callback:
+    get:
+      description: Exchanges the authorization code and renders a small completion
+        page
+      parameters:
+      - description: Authorization code
+        in: query
+        name: code
+        type: string
+      - description: State parameter
+        in: query
+        name: state
+        type: string
+      - description: OAuth error
+        in: query
+        name: error
+        type: string
+      - description: OAuth error description
+        in: query
+        name: error_description
+        type: string
+      responses:
+        "200":
+          description: HTML result page
+          schema:
+            type: string
+        "400":
+          description: HTML error page
+          schema:
+            type: string
+      summary: OAuth callback for MCP connections
+      tags:
+      - mcp
   /ping:
     get:
       responses:

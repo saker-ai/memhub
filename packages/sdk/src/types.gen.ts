@@ -949,9 +949,23 @@ export type HandlersErrorResponse = {
     message?: string;
 };
 
+export type HandlersFsArchiveRequest = {
+    paths?: Array<string>;
+};
+
 export type HandlersFsDeleteRequest = {
     path?: string;
     recursive?: boolean;
+};
+
+export type HandlersFsExtractRequest = {
+    path?: string;
+};
+
+export type HandlersFsExtractResponse = {
+    destination?: string;
+    directories?: number;
+    files?: number;
 };
 
 export type HandlersFsFileInfo = {
@@ -2884,6 +2898,49 @@ export type GetBotsByBotIdContainerFsResponses = {
 
 export type GetBotsByBotIdContainerFsResponse = GetBotsByBotIdContainerFsResponses[keyof GetBotsByBotIdContainerFsResponses];
 
+export type PostBotsByBotIdContainerFsArchiveData = {
+    /**
+     * Archive request
+     */
+    body: HandlersFsArchiveRequest;
+    path: {
+        /**
+         * Bot ID
+         */
+        bot_id: string;
+    };
+    query?: never;
+    url: '/bots/{bot_id}/container/fs/archive';
+};
+
+export type PostBotsByBotIdContainerFsArchiveErrors = {
+    /**
+     * Bad Request
+     */
+    400: HandlersErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: HandlersErrorResponse;
+    /**
+     * Not Found
+     */
+    404: HandlersErrorResponse;
+    /**
+     * Internal Server Error
+     */
+    500: HandlersErrorResponse;
+};
+
+export type PostBotsByBotIdContainerFsArchiveError = PostBotsByBotIdContainerFsArchiveErrors[keyof PostBotsByBotIdContainerFsArchiveErrors];
+
+export type PostBotsByBotIdContainerFsArchiveResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type PostBotsByBotIdContainerFsDeleteData = {
     /**
      * Delete request
@@ -2969,6 +3026,55 @@ export type GetBotsByBotIdContainerFsDownloadResponses = {
      */
     200: unknown;
 };
+
+export type PostBotsByBotIdContainerFsExtractData = {
+    /**
+     * Extract request
+     */
+    body: HandlersFsExtractRequest;
+    path: {
+        /**
+         * Bot ID
+         */
+        bot_id: string;
+    };
+    query?: never;
+    url: '/bots/{bot_id}/container/fs/extract';
+};
+
+export type PostBotsByBotIdContainerFsExtractErrors = {
+    /**
+     * Bad Request
+     */
+    400: HandlersErrorResponse;
+    /**
+     * Forbidden
+     */
+    403: HandlersErrorResponse;
+    /**
+     * Not Found
+     */
+    404: HandlersErrorResponse;
+    /**
+     * Conflict
+     */
+    409: HandlersErrorResponse;
+    /**
+     * Internal Server Error
+     */
+    500: HandlersErrorResponse;
+};
+
+export type PostBotsByBotIdContainerFsExtractError = PostBotsByBotIdContainerFsExtractErrors[keyof PostBotsByBotIdContainerFsExtractErrors];
+
+export type PostBotsByBotIdContainerFsExtractResponses = {
+    /**
+     * OK
+     */
+    200: HandlersFsExtractResponse;
+};
+
+export type PostBotsByBotIdContainerFsExtractResponse = PostBotsByBotIdContainerFsExtractResponses[keyof PostBotsByBotIdContainerFsExtractResponses];
 
 export type GetBotsByBotIdContainerFsListData = {
     body?: never;
@@ -7806,6 +7912,48 @@ export type PostModelsByIdTestResponses = {
 };
 
 export type PostModelsByIdTestResponse = PostModelsByIdTestResponses[keyof PostModelsByIdTestResponses];
+
+export type GetOauthMcpCallbackData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Authorization code
+         */
+        code?: string;
+        /**
+         * State parameter
+         */
+        state?: string;
+        /**
+         * OAuth error
+         */
+        error?: string;
+        /**
+         * OAuth error description
+         */
+        error_description?: string;
+    };
+    url: '/oauth/mcp/callback';
+};
+
+export type GetOauthMcpCallbackErrors = {
+    /**
+     * HTML error page
+     */
+    400: string;
+};
+
+export type GetOauthMcpCallbackError = GetOauthMcpCallbackErrors[keyof GetOauthMcpCallbackErrors];
+
+export type GetOauthMcpCallbackResponses = {
+    /**
+     * HTML result page
+     */
+    200: string;
+};
+
+export type GetOauthMcpCallbackResponse = GetOauthMcpCallbackResponses[keyof GetOauthMcpCallbackResponses];
 
 export type GetPingData = {
     body?: never;

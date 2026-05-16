@@ -5,7 +5,7 @@
         variant="ghost"
         size="sm"
         class="size-7 p-0"
-        :disabled="loading"
+        :disabled="loading || operationLoading"
         :title="t('bots.files.upload')"
         @click="triggerUpload"
       >
@@ -15,7 +15,17 @@
         variant="ghost"
         size="sm"
         class="size-7 p-0"
-        :disabled="loading"
+        :disabled="loading || operationLoading"
+        :title="t('bots.files.uploadFolder')"
+        @click="triggerDirectoryUpload"
+      >
+        <FolderUp class="size-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        class="size-7 p-0"
+        :disabled="loading || operationLoading"
         :title="t('bots.files.newFolder')"
         @click="openMkdirDialog"
       >
@@ -25,7 +35,7 @@
         variant="ghost"
         size="sm"
         class="size-7 p-0 ml-auto"
-        :disabled="loading"
+        :disabled="loading || operationLoading"
         :title="t('common.refresh')"
         @click="reload"
       >
@@ -66,8 +76,58 @@
       ref="uploadInputRef"
       type="file"
       class="hidden"
+      :disabled="operationLoading"
       @change="handleUpload"
     >
+    <input
+      ref="directoryInputRef"
+      type="file"
+      class="hidden"
+      multiple
+      webkitdirectory
+      :disabled="operationLoading"
+      @change="handleDirectoryInputUpload"
+    >
+
+    <div
+      v-if="selectedCount > 0 || uploadStatus"
+      class="flex shrink-0 items-center gap-1 border-y border-border/60 px-2 py-1.5 text-[11px]"
+    >
+      <span
+        v-if="selectedCount > 0"
+        class="text-muted-foreground"
+      >
+        {{ t('bots.files.selectedCount', { count: selectedCount }) }}
+      </span>
+      <span
+        v-if="uploadStatus"
+        class="min-w-0 truncate text-muted-foreground"
+      >
+        {{ uploadStatus }}
+      </span>
+      <Button
+        v-if="selectedCount > 0"
+        variant="ghost"
+        size="sm"
+        class="ml-auto h-6 px-2 text-[11px]"
+        :disabled="operationLoading"
+        @click="handleBatchDownload"
+      >
+        <Download class="mr-1 size-3" />
+        {{ t('bots.files.download') }}
+      </Button>
+      <Button
+        v-if="selectedCount > 0"
+        variant="ghost"
+        size="sm"
+        class="h-6 px-2 text-[11px] text-destructive hover:text-destructive"
+        :disabled="operationLoading"
+        @click="openBatchDeleteDialog"
+      >
+        <Trash2 class="mr-1 size-3" />
+        {{ t('bots.files.delete') }}
+      </Button>
+    </div>
 
     <div class="flex-1 min-h-0 relative">
       <div class="absolute inset-0">
@@ -75,11 +135,16 @@
           <FileList
             :entries="entries"
             :loading="loading"
+            :selected-paths="selectedPaths"
+            :selection-disabled="operationLoading"
             @navigate="navigateTo"
             @open="handleOpenFile"
             @download="handleDownload"
+            @extract="handleExtract"
             @rename="openRenameDialog"
             @delete="openDeleteDialog"
+            @toggle-select="toggleSelection"
+            @select-all="selectAllVisible"
           />
         </ScrollArea>
       </div>
@@ -181,14 +246,45 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <Dialog v-model:open="batchDeleteDialogOpen">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{{ t('bots.files.confirmDelete') }}</DialogTitle>
+        </DialogHeader>
+        <p class="text-xs text-muted-foreground">
+          {{ t('bots.files.confirmBatchDeleteMessage', { count: selectedCount }) }}
+        </p>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            :disabled="batchDeleteLoading"
+            @click="batchDeleteDialogOpen = false"
+          >
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            variant="destructive"
+            :disabled="batchDeleteLoading"
+            @click="handleBatchDelete"
+          >
+            <Spinner
+              v-if="batchDeleteLoading"
+              class="mr-1"
+            />
+            {{ t('bots.files.delete') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { ChevronRight, Folder, Upload, FolderPlus, RefreshCw } from 'lucide-vue-next'
+import { ChevronRight, Download, Folder, FolderUp, Upload, FolderPlus, RefreshCw, Trash2 } from 'lucide-vue-next'
 import {
   Button,
   Input,
@@ -227,6 +323,42 @@ const currentPath = ref('/data')
 const entries = ref<HandlersFsFileInfo[]>([])
 const loading = ref(false)
 const uploadInputRef = ref<HTMLInputElement>()
+const directoryInputRef = ref<HTMLInputElement>()
+const uploadStatus = ref('')
+const directoryUploading = ref(false)
+const batchArchiveLoading = ref(false)
+const extractLoading = ref(false)
+const batchDeleteDialogOpen = ref(false)
+const batchDeleteLoading = ref(false)
+const selectedPaths = ref<Set<string>>(new Set())
+const selectedEntries = computed(() => entries.value.filter(entry => entry.path && selectedPaths.value.has(entry.path)))
+const selectedCount = computed(() => selectedEntries.value.length)
+const operationLoading = computed(() => directoryUploading.value || batchArchiveLoading.value || extractLoading.value || batchDeleteLoading.value)
+
+interface DirectoryUploadFile {
+  file: File
+  relativePath: string
+}
+
+interface DirectoryUploadPayload {
+  rootName: string
+  files: DirectoryUploadFile[]
+  directories: string[]
+}
+
+interface FileSystemDirectoryHandleLike {
+  name: string
+  entries(): AsyncIterableIterator<[string, FileSystemHandleLike]>
+}
+
+interface FileSystemFileHandleLike {
+  name: string
+  getFile(): Promise<File>
+}
+
+type FileSystemHandleLike =
+  | (FileSystemDirectoryHandleLike & { kind: 'directory' })
+  | (FileSystemFileHandleLike & { kind: 'file' })
 
 function isTransientWorkspaceError(error: unknown): boolean {
   const detail = resolveApiErrorMessage(error, '').toLowerCase()
@@ -238,6 +370,32 @@ function isTransientWorkspaceError(error: unknown): boolean {
 
 function wait(ms: number): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, ms))
+}
+
+function authHeaders(): HeadersInit {
+  const headers: Record<string, string> = {}
+  const token = localStorage.getItem('token')?.trim()
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
+
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = await response.json() as { message?: string, error?: string }
+    return data.message || data.error || fallback
+  } catch {
+    const text = await response.text().catch(() => '')
+    return text || fallback
+  }
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 async function loadDirectory(path: string) {
@@ -254,6 +412,7 @@ async function loadDirectory(path: string) {
         })
         entries.value = data.entries ?? []
         currentPath.value = data.path ?? path
+        pruneSelection()
         return
       } catch (error) {
         lastError = error
@@ -287,6 +446,176 @@ function handleOpenFile(entry: HandlersFsFileInfo) {
 
 function triggerUpload() {
   uploadInputRef.value?.click()
+}
+
+async function triggerDirectoryUpload() {
+  const picker = (window as unknown as {
+    showDirectoryPicker?: () => Promise<FileSystemDirectoryHandleLike>
+  }).showDirectoryPicker
+
+  if (picker) {
+    try {
+      const handle = await picker()
+      await uploadDirectoryPayload(await collectDirectoryHandle(handle))
+      return
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      toast.error(resolveApiErrorMessage(error, t('bots.files.uploadFailed')))
+      return
+    }
+  }
+
+  directoryInputRef.value?.click()
+}
+
+function joinRelativePath(...parts: string[]): string {
+  return parts
+    .filter(Boolean)
+    .join('/')
+    .replace(/\/+/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+}
+
+function parentRelativeDirs(relativePath: string): string[] {
+  const parts = relativePath.split('/').filter(Boolean)
+  parts.pop()
+  const dirs: string[] = []
+  let current = ''
+  for (const part of parts) {
+    current = joinRelativePath(current, part)
+    dirs.push(current)
+  }
+  return dirs
+}
+
+async function collectDirectoryHandle(root: FileSystemDirectoryHandleLike): Promise<DirectoryUploadPayload> {
+  const files: DirectoryUploadFile[] = []
+  const directories = new Set<string>()
+
+  async function walk(dir: FileSystemDirectoryHandleLike, prefix = '') {
+    for await (const [name, handle] of dir.entries()) {
+      const relativePath = joinRelativePath(prefix, name)
+      if (handle.kind === 'directory') {
+        directories.add(relativePath)
+        await walk(handle, relativePath)
+      } else {
+        files.push({ file: await handle.getFile(), relativePath })
+      }
+    }
+  }
+
+  await walk(root)
+  return {
+    rootName: root.name || t('bots.files.uploadedFolderFallbackName'),
+    files,
+    directories: [...directories],
+  }
+}
+
+function collectDirectoryInput(files: FileList): DirectoryUploadPayload | null {
+  const uploadFiles = Array.from(files)
+  if (uploadFiles.length === 0) return null
+  const firstPath = uploadFiles[0]?.webkitRelativePath || uploadFiles[0]?.name || ''
+  const rootName = firstPath.split('/').filter(Boolean)[0] || t('bots.files.uploadedFolderFallbackName')
+  const directories = new Set<string>()
+  const payloadFiles = uploadFiles.map((file) => {
+    const rawRelativePath = file.webkitRelativePath || file.name
+    const parts = rawRelativePath.split('/').filter(Boolean)
+    const relativePath = joinRelativePath(...(parts[0] === rootName ? parts.slice(1) : parts))
+    for (const dir of parentRelativeDirs(relativePath)) {
+      directories.add(dir)
+    }
+    return { file, relativePath }
+  }).filter(item => item.relativePath)
+  return { rootName, files: payloadFiles, directories: [...directories] }
+}
+
+async function handleDirectoryInputUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const payload = input.files ? collectDirectoryInput(input.files) : null
+  if (!payload) return
+  try {
+    await uploadDirectoryPayload(payload)
+  } finally {
+    input.value = ''
+  }
+}
+
+async function uploadDirectoryPayload(payload: DirectoryUploadPayload) {
+  if (directoryUploading.value) return
+  const rootName = payload.rootName.trim() || t('bots.files.uploadedFolderFallbackName')
+  const destinationRoot = joinPath(currentPath.value, rootName)
+  const directories = [...new Set([
+    '',
+    ...payload.directories,
+    ...payload.files.flatMap(file => parentRelativeDirs(file.relativePath)),
+  ])]
+
+  directoryUploading.value = true
+  uploadStatus.value = t('bots.files.uploadFolderProgress', {
+    done: 0,
+    total: payload.files.length + directories.length,
+  })
+  let completed = 0
+  let failed = 0
+  const total = payload.files.length + directories.length
+  const updateProgress = () => {
+    uploadStatus.value = t('bots.files.uploadFolderProgress', { done: completed, total })
+  }
+
+  try {
+    for (const dir of directories) {
+      try {
+        await postBotsByBotIdContainerFsMkdir({
+          path: { bot_id: props.botId },
+          body: { path: joinPath(destinationRoot, dir) },
+          throwOnError: true,
+        })
+      } catch {
+        failed++
+      } finally {
+        completed++
+        updateProgress()
+      }
+    }
+
+    let cursor = 0
+    const concurrency = 4
+    async function worker() {
+      for (;;) {
+        const index = cursor++
+        const item = payload.files[index]
+        if (!item) return
+        try {
+          await postBotsByBotIdContainerFsUpload({
+            path: { bot_id: props.botId },
+            body: { path: joinPath(destinationRoot, item.relativePath), file: item.file } as never,
+            throwOnError: true,
+          })
+        } catch {
+          failed++
+        } finally {
+          completed++
+          updateProgress()
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, payload.files.length) }, () => worker()))
+
+    if (failed > 0) {
+      toast.error(t('bots.files.uploadFolderPartialFailed', { failed, total }))
+    } else {
+      toast.success(t('bots.files.uploadFolderSuccess'))
+    }
+    await loadDirectory(currentPath.value)
+  } catch (error) {
+    toast.error(resolveApiErrorMessage(error, t('bots.files.uploadFailed')))
+  } finally {
+    directoryUploading.value = false
+    window.setTimeout(() => {
+      if (!directoryUploading.value) uploadStatus.value = ''
+    }, 1500)
+  }
 }
 
 async function handleUpload(event: Event) {
@@ -406,6 +735,120 @@ async function handleDelete() {
   }
 }
 
+function pruneSelection() {
+  const visiblePaths = new Set(entries.value.map(entry => entry.path).filter(Boolean))
+  const next = new Set<string>()
+  for (const selected of selectedPaths.value) {
+    if (visiblePaths.has(selected)) next.add(selected)
+  }
+  selectedPaths.value = next
+}
+
+function toggleSelection(entry: HandlersFsFileInfo, selected: boolean) {
+  if (!entry.path) return
+  const next = new Set(selectedPaths.value)
+  if (selected) next.add(entry.path)
+  else next.delete(entry.path)
+  selectedPaths.value = next
+}
+
+function selectAllVisible(selected: boolean) {
+  if (!selected) {
+    selectedPaths.value = new Set()
+    return
+  }
+  selectedPaths.value = new Set(entries.value.map(entry => entry.path).filter((value): value is string => !!value))
+}
+
+async function handleBatchDownload() {
+  const paths = selectedEntries.value.map(entry => entry.path).filter((value): value is string => !!value)
+  if (paths.length === 0 || batchArchiveLoading.value) return
+  batchArchiveLoading.value = true
+  try {
+    const response = await fetch(sdkApiUrl({
+      url: '/bots/{bot_id}/container/fs/archive',
+      path: { bot_id: props.botId },
+    }), {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ paths }),
+    })
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, t('bots.files.downloadFailed')))
+    }
+    downloadBlob(await response.blob(), 'workspace-selection.tar.gz')
+  } catch (error) {
+    toast.error(resolveApiErrorMessage(error, t('bots.files.downloadFailed')))
+  } finally {
+    batchArchiveLoading.value = false
+  }
+}
+
+function openBatchDeleteDialog() {
+  if (selectedCount.value === 0) return
+  batchDeleteDialogOpen.value = true
+}
+
+async function handleBatchDelete() {
+  const targets = [...selectedEntries.value]
+  if (targets.length === 0 || batchDeleteLoading.value) return
+  batchDeleteLoading.value = true
+  let failed = 0
+  try {
+    for (const target of targets) {
+      try {
+        await postBotsByBotIdContainerFsDelete({
+          path: { bot_id: props.botId },
+          body: { path: target.path, recursive: target.isDir },
+          throwOnError: true,
+        })
+      } catch {
+        failed++
+      }
+    }
+    batchDeleteDialogOpen.value = false
+    selectedPaths.value = new Set()
+    if (failed > 0) {
+      toast.error(t('bots.files.batchDeletePartialFailed', { failed, total: targets.length }))
+    } else {
+      toast.success(t('bots.files.deleteSuccess'))
+    }
+    void loadDirectory(currentPath.value)
+  } finally {
+    batchDeleteLoading.value = false
+  }
+}
+
+async function handleExtract(entry: HandlersFsFileInfo) {
+  if (!entry.path || extractLoading.value) return
+  extractLoading.value = true
+  try {
+    const response = await fetch(sdkApiUrl({
+      url: '/bots/{bot_id}/container/fs/extract',
+      path: { bot_id: props.botId },
+    }), {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ path: entry.path }),
+    })
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, t('bots.files.extractFailed')))
+    }
+    toast.success(t('bots.files.extractSuccess'))
+    void loadDirectory(currentPath.value)
+  } catch (error) {
+    toast.error(resolveApiErrorMessage(error, t('bots.files.extractFailed')))
+  } finally {
+    extractLoading.value = false
+  }
+}
+
 function handleDownload(entry: HandlersFsFileInfo) {
   const url = sdkApiUrl({
     url: '/bots/{bot_id}/container/fs/download',
@@ -414,7 +857,7 @@ function handleDownload(entry: HandlersFsFileInfo) {
   })
   const a = document.createElement('a')
   a.href = url
-  a.download = entry.name ?? 'file'
+  a.download = entry.isDir ? `${entry.name ?? 'folder'}.tar.gz` : (entry.name ?? 'file')
   a.click()
 }
 

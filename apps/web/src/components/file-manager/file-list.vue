@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { LoaderCircle, FolderOpen, Folder, File, Download, SquarePen, Trash2 } from 'lucide-vue-next'
+import { ArchiveRestore, LoaderCircle, FolderOpen, Folder, File, Download, SquarePen, Trash2 } from 'lucide-vue-next'
 import {
+  Checkbox,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -10,19 +11,24 @@ import {
   ContextMenuTrigger,
 } from '@memohai/ui'
 import type { HandlersFsFileInfo } from '@memohai/sdk'
-import { formatFileSize, formatRelativeTime } from './utils'
+import { formatFileSize, formatRelativeTime, isArchiveFile } from './utils'
 
 const props = defineProps<{
   entries: HandlersFsFileInfo[]
   loading?: boolean
+  selectedPaths?: Set<string>
+  selectionDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
   navigate: [path: string]
   open: [entry: HandlersFsFileInfo]
   download: [entry: HandlersFsFileInfo]
+  extract: [entry: HandlersFsFileInfo]
   rename: [entry: HandlersFsFileInfo]
   delete: [entry: HandlersFsFileInfo]
+  toggleSelect: [entry: HandlersFsFileInfo, selected: boolean]
+  selectAll: [selected: boolean]
 }>()
 
 const { t } = useI18n()
@@ -37,12 +43,30 @@ const sortedEntries = computed(() => {
   return [...dirs, ...files]
 })
 
+const selectableEntries = computed(() => sortedEntries.value.filter(entry => !!entry.path))
+
+const selectedCount = computed(() => selectableEntries.value.filter(entry => props.selectedPaths?.has(entry.path ?? '')).length)
+
+const allSelectedState = computed(() => {
+  if (selectableEntries.value.length === 0 || selectedCount.value === 0) return false
+  if (selectedCount.value === selectableEntries.value.length) return true
+  return 'indeterminate'
+})
+
 function handleClick(entry: HandlersFsFileInfo) {
   if (entry.isDir) {
     emit('navigate', entry.path ?? '')
   } else {
     emit('open', entry)
   }
+}
+
+function toggleEntry(entry: HandlersFsFileInfo, checked: boolean | 'indeterminate') {
+  emit('toggleSelect', entry, checked === true)
+}
+
+function toggleAll(checked: boolean | 'indeterminate') {
+  emit('selectAll', checked === true)
 }
 </script>
 
@@ -71,6 +95,14 @@ function handleClick(entry: HandlersFsFileInfo) {
     <div v-else>
       <!-- Header row -->
       <div class="flex items-center border-b border-border px-3 py-2 text-xs font-medium text-muted-foreground">
+        <div class="mr-2 flex w-5 shrink-0 items-center justify-center">
+          <Checkbox
+            :checked="allSelectedState"
+            :disabled="selectionDisabled || selectableEntries.length === 0"
+            :aria-label="t('bots.files.selectAll')"
+            @update:checked="toggleAll"
+          />
+        </div>
         <div class="flex-1">
           {{ t('bots.files.name') }}
         </div>
@@ -92,6 +124,17 @@ function handleClick(entry: HandlersFsFileInfo) {
             class="flex items-center border-b border-border/50 cursor-pointer px-3 py-2 text-xs transition-colors hover:bg-muted/50"
             @click="handleClick(entry)"
           >
+            <div
+              class="mr-2 flex w-5 shrink-0 items-center justify-center"
+              @click.stop
+            >
+              <Checkbox
+                :checked="selectedPaths?.has(entry.path ?? '') ?? false"
+                :disabled="selectionDisabled || !entry.path"
+                :aria-label="t('bots.files.selectItem', { name: entry.name ?? '' })"
+                @update:checked="checked => toggleEntry(entry, checked)"
+              />
+            </div>
             <div class="flex flex-1 items-center gap-2 min-w-0">
               <component
                 :is="entry.isDir ? Folder : File"
@@ -109,14 +152,20 @@ function handleClick(entry: HandlersFsFileInfo) {
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem
-            v-if="!entry.isDir"
-            @select="emit('download', entry)"
-          >
+          <ContextMenuItem @select="emit('download', entry)">
             <Download
               class="mr-2 size-3.5"
             />
             {{ t('bots.files.download') }}
+          </ContextMenuItem>
+          <ContextMenuItem
+            v-if="!entry.isDir && isArchiveFile(entry.name)"
+            @select="emit('extract', entry)"
+          >
+            <ArchiveRestore
+              class="mr-2 size-3.5"
+            />
+            {{ t('bots.files.extract') }}
           </ContextMenuItem>
           <ContextMenuItem @select="emit('rename', entry)">
             <SquarePen

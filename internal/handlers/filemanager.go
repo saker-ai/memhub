@@ -1,6 +1,10 @@
 package handlers
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -67,6 +71,22 @@ type FSRenameRequest struct {
 	NewPath string `json:"newPath"`
 }
 
+// FSArchiveRequest is the body for downloading multiple files/directories as tar.gz.
+type FSArchiveRequest struct {
+	Paths []string `json:"paths"`
+}
+
+// FSExtractRequest is the body for extracting an archive in the workspace.
+type FSExtractRequest struct {
+	Path string `json:"path"`
+}
+
+type FSExtractResponse struct {
+	Destination string `json:"destination"`
+	Files       int    `json:"files"`
+	Directories int    `json:"directories"`
+}
+
 type fsOpResponse struct {
 	OK bool `json:"ok"`
 }
@@ -88,6 +108,112 @@ func resolveContainerPath(rawPath string) (string, error) {
 func isContainerMediaPath(containerPath string) bool {
 	cleaned := path.Clean("/" + strings.ReplaceAll(strings.TrimSpace(containerPath), "\\", "/"))
 	return cleaned == mediaContainerRoot || strings.HasPrefix(cleaned, mediaContainerRoot+"/")
+}
+
+func isPathWithin(parentPath, childPath string) bool {
+	parentPath = path.Clean(parentPath)
+	childPath = path.Clean(childPath)
+	return childPath == parentPath || strings.HasPrefix(childPath, strings.TrimRight(parentPath, "/")+"/")
+}
+
+func dedupeArchivePaths(paths []string) ([]string, error) {
+	seen := make(map[string]struct{}, len(paths))
+	cleaned := make([]string, 0, len(paths))
+	for _, raw := range paths {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		containerPath, err := resolveContainerPath(raw)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[containerPath]; ok {
+			continue
+		}
+		seen[containerPath] = struct{}{}
+		cleaned = append(cleaned, containerPath)
+	}
+	parentsOnly := cleaned[:0]
+	for _, candidate := range cleaned {
+		nested := false
+		for _, other := range cleaned {
+			if candidate != other && isPathWithin(other, candidate) {
+				nested = true
+				break
+			}
+		}
+		if !nested {
+			parentsOnly = append(parentsOnly, candidate)
+		}
+	}
+	if len(parentsOnly) == 0 {
+		return nil, errors.New("paths are required")
+	}
+	return parentsOnly, nil
+}
+
+func uniqueArchiveName(containerPath string, used map[string]int) string {
+	name := path.Base(containerPath)
+	if name == "." || name == "/" || name == "" {
+		name = "workspace"
+	}
+	if count := used[name]; count > 0 {
+		used[name] = count + 1
+		ext := path.Ext(name)
+		base := strings.TrimSuffix(name, ext)
+		if base == "" {
+			base = name
+			ext = ""
+		}
+		return fmt.Sprintf("%s-%d%s", base, count+1, ext)
+	}
+	used[name] = 1
+	return name
+}
+
+func safeArchiveEntryPath(name string) (string, error) {
+	cleaned := path.Clean(strings.ReplaceAll(strings.TrimSpace(name), "\\", "/"))
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned == "." || cleaned == "" {
+		return "", nil
+	}
+	for _, part := range strings.Split(cleaned, "/") {
+		if part == ".." {
+			return "", errors.New("archive contains invalid path")
+		}
+	}
+	return cleaned, nil
+}
+
+func defaultExtractDestination(containerPath string) string {
+	dir := path.Dir(containerPath)
+	name := path.Base(containerPath)
+	lower := strings.ToLower(name)
+	switch {
+	case strings.HasSuffix(lower, ".tar.gz"):
+		name = name[:len(name)-len(".tar.gz")]
+	case strings.HasSuffix(lower, ".tgz"):
+		name = name[:len(name)-len(".tgz")]
+	case strings.HasSuffix(lower, ".zip"):
+		name = name[:len(name)-len(".zip")]
+	default:
+		name = strings.TrimSuffix(name, path.Ext(name))
+	}
+	if strings.TrimSpace(name) == "" || name == "." {
+		name = "extracted"
+	}
+	return path.Join(dir, name)
+}
+
+func archiveDownloadName(containerPath string, isDir bool) string {
+	name := path.Base(containerPath)
+	if name == "." || name == "/" || name == "" {
+		name = "workspace"
+	}
+	if isDir {
+		return name + ".tar.gz"
+	}
+	return name
 }
 
 // getGRPCClient returns the gRPC client for the bot's container.
@@ -319,6 +445,17 @@ func (h *ContainerdHandler) FSDownload(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, fmt.Sprintf("container not reachable: %v", err))
 	}
 
+	entry, err := client.Stat(ctx, containerPath)
+	if err != nil {
+		return fsHTTPError(err)
+	}
+	if entry.GetIsDir() {
+		fileName := archiveDownloadName(containerPath, true)
+		c.Response().Header().Set(echo.HeaderContentType, "application/gzip")
+		c.Response().Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
+		return h.writeArchive(ctx, client, []string{containerPath}, c.Response().Writer)
+	}
+
 	rc, err := client.ReadRaw(ctx, containerPath)
 	if err != nil {
 		return fsHTTPError(err)
@@ -338,6 +475,133 @@ func (h *ContainerdHandler) FSDownload(c echo.Context) error {
 
 	c.Response().Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
 	return c.Blob(http.StatusOK, contentType, data)
+}
+
+// FSArchive godoc
+// @Summary Download files and directories as tar.gz
+// @Description Downloads selected files/directories from the workspace as a tar.gz archive
+// @Tags containerd
+// @Param bot_id path string true "Bot ID"
+// @Param payload body FSArchiveRequest true "Archive request"
+// @Produce octet-stream
+// @Success 200 {file} binary
+// @Failure 400 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /bots/{bot_id}/container/fs/archive [post].
+func (h *ContainerdHandler) FSArchive(c echo.Context) error {
+	botID, err := h.requireBotAccess(c)
+	if err != nil {
+		return err
+	}
+	var req FSArchiveRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	paths, err := dedupeArchivePaths(req.Paths)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	ctx := c.Request().Context()
+	client, err := h.getGRPCClient(ctx, botID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, fmt.Sprintf("container not reachable: %v", err))
+	}
+	for _, p := range paths {
+		if _, err := client.Stat(ctx, p); err != nil {
+			return fsHTTPError(err)
+		}
+	}
+
+	c.Response().Header().Set(echo.HeaderContentType, "application/gzip")
+	c.Response().Header().Set("Content-Disposition", `attachment; filename="workspace-selection.tar.gz"`)
+	return h.writeArchive(ctx, client, paths, c.Response().Writer)
+}
+
+func (h *ContainerdHandler) writeArchive(ctx context.Context, client *bridge.Client, containerPaths []string, w io.Writer) error {
+	gw := gzip.NewWriter(w)
+	defer func() { _ = gw.Close() }()
+	tw := tar.NewWriter(gw)
+	defer func() { _ = tw.Close() }()
+
+	paths, err := dedupeArchivePaths(containerPaths)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	usedNames := make(map[string]int, len(paths))
+	for _, containerPath := range paths {
+		entry, err := client.Stat(ctx, containerPath)
+		if err != nil {
+			return fsHTTPError(err)
+		}
+		archiveName := uniqueArchiveName(containerPath, usedNames)
+		if err := h.writeArchiveEntry(ctx, client, tw, containerPath, archiveName, entry.GetIsDir()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *ContainerdHandler) writeArchiveEntry(ctx context.Context, client *bridge.Client, tw *tar.Writer, containerPath, archivePath string, isDir bool) error {
+	archivePath, err := safeArchiveEntryPath(archivePath)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if archivePath == "" {
+		return nil
+	}
+
+	entry, err := client.Stat(ctx, containerPath)
+	if err != nil {
+		return fsHTTPError(err)
+	}
+
+	header := &tar.Header{
+		Name: archivePath,
+		Mode: 0o755,
+		Size: entry.GetSize(),
+	}
+	if isDir {
+		header.Typeflag = tar.TypeDir
+		header.Name = strings.TrimRight(archivePath, "/") + "/"
+		header.Size = 0
+		if err := tw.WriteHeader(header); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("archive directory: %v", err))
+		}
+		entries, err := client.ListDirAll(ctx, containerPath, false)
+		if err != nil {
+			return fsHTTPError(err)
+		}
+		for _, child := range entries {
+			name := path.Base(child.GetPath())
+			if name == "." || name == "/" || name == "" {
+				continue
+			}
+			childContainerPath := path.Join(containerPath, name)
+			childArchivePath := path.Join(archivePath, name)
+			if err := h.writeArchiveEntry(ctx, client, tw, childContainerPath, childArchivePath, child.GetIsDir()); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	header.Typeflag = tar.TypeReg
+	header.Mode = 0o644
+	if err := tw.WriteHeader(header); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("archive file: %v", err))
+	}
+	rc, err := client.ReadRaw(ctx, containerPath)
+	if err != nil {
+		return fsHTTPError(err)
+	}
+	defer func() { _ = rc.Close() }()
+	if _, err := io.Copy(tw, rc); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Sprintf("archive copy: %v", err))
+	}
+	return nil
 }
 
 // FSWrite godoc
@@ -571,4 +835,170 @@ func (h *ContainerdHandler) FSRename(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, fsOpResponse{OK: true})
+}
+
+// FSExtract godoc
+// @Summary Extract an archive file
+// @Description Extracts a .zip, .tar.gz, or .tgz file into a sibling directory named after the archive
+// @Tags containerd
+// @Param bot_id path string true "Bot ID"
+// @Param payload body FSExtractRequest true "Extract request"
+// @Success 200 {object} FSExtractResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /bots/{bot_id}/container/fs/extract [post].
+func (h *ContainerdHandler) FSExtract(c echo.Context) error {
+	botID, err := h.requireBotAccess(c)
+	if err != nil {
+		return err
+	}
+	var req FSExtractRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if strings.TrimSpace(req.Path) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "path is required")
+	}
+	containerPath, err := resolveContainerPath(req.Path)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	lower := strings.ToLower(containerPath)
+	if !strings.HasSuffix(lower, ".zip") && !strings.HasSuffix(lower, ".tar.gz") && !strings.HasSuffix(lower, ".tgz") {
+		return echo.NewHTTPError(http.StatusBadRequest, "unsupported archive format")
+	}
+
+	ctx := c.Request().Context()
+	client, err := h.getGRPCClient(ctx, botID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, fmt.Sprintf("container not reachable: %v", err))
+	}
+	entry, err := client.Stat(ctx, containerPath)
+	if err != nil {
+		return fsHTTPError(err)
+	}
+	if entry.GetIsDir() {
+		return echo.NewHTTPError(http.StatusBadRequest, "path must be an archive file")
+	}
+
+	destination := defaultExtractDestination(containerPath)
+	if _, err := client.Stat(ctx, destination); err == nil {
+		return echo.NewHTTPError(http.StatusConflict, "destination already exists")
+	} else if !errors.Is(err, bridge.ErrNotFound) {
+		return fsHTTPError(err)
+	}
+	if err := client.Mkdir(ctx, destination); err != nil {
+		return fsHTTPError(err)
+	}
+
+	rc, err := client.ReadRaw(ctx, containerPath)
+	if err != nil {
+		return fsHTTPError(err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	var resp FSExtractResponse
+	resp.Destination = destination
+	switch {
+	case strings.HasSuffix(lower, ".zip"):
+		resp.Files, resp.Directories, err = extractZip(ctx, client, rc, destination)
+	default:
+		resp.Files, resp.Directories, err = extractTarGz(ctx, client, rc, destination)
+	}
+	if err != nil {
+		_ = client.DeleteFile(ctx, destination, true)
+		return err
+	}
+	return c.JSON(http.StatusOK, resp)
+}
+
+func extractZip(ctx context.Context, client *bridge.Client, r io.Reader, destination string) (int, int, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return 0, 0, echo.NewHTTPError(http.StatusInternalServerError, "failed to read archive")
+	}
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return 0, 0, echo.NewHTTPError(http.StatusBadRequest, "invalid zip archive")
+	}
+	files, dirs := 0, 0
+	for _, file := range zr.File {
+		entryPath, err := safeArchiveEntryPath(file.Name)
+		if err != nil {
+			return files, dirs, echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		if entryPath == "" {
+			continue
+		}
+		targetPath := path.Join(destination, entryPath)
+		if file.FileInfo().IsDir() {
+			if err := client.Mkdir(ctx, targetPath); err != nil {
+				return files, dirs, fsHTTPError(err)
+			}
+			dirs++
+			continue
+		}
+		src, err := file.Open()
+		if err != nil {
+			return files, dirs, echo.NewHTTPError(http.StatusBadRequest, "invalid zip entry")
+		}
+		written, writeErr := client.WriteRaw(ctx, targetPath, src)
+		closeErr := src.Close()
+		if writeErr != nil {
+			return files, dirs, fsHTTPError(writeErr)
+		}
+		if closeErr != nil {
+			return files, dirs, echo.NewHTTPError(http.StatusInternalServerError, closeErr.Error())
+		}
+		if written >= 0 {
+			files++
+		}
+	}
+	return files, dirs, nil
+}
+
+func extractTarGz(ctx context.Context, client *bridge.Client, r io.Reader, destination string) (int, int, error) {
+	gr, err := gzip.NewReader(r)
+	if err != nil {
+		return 0, 0, echo.NewHTTPError(http.StatusBadRequest, "invalid gzip archive")
+	}
+	defer func() { _ = gr.Close() }()
+
+	tr := tar.NewReader(gr)
+	files, dirs := 0, 0
+	for {
+		header, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return files, dirs, echo.NewHTTPError(http.StatusBadRequest, "invalid tar archive")
+		}
+		entryPath, err := safeArchiveEntryPath(header.Name)
+		if err != nil {
+			return files, dirs, echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		if entryPath == "" {
+			continue
+		}
+		targetPath := path.Join(destination, entryPath)
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := client.Mkdir(ctx, targetPath); err != nil {
+				return files, dirs, fsHTTPError(err)
+			}
+			dirs++
+		case tar.TypeReg:
+			if _, err := client.WriteRaw(ctx, targetPath, tr); err != nil {
+				return files, dirs, fsHTTPError(err)
+			}
+			files++
+		default:
+			continue
+		}
+	}
+	return files, dirs, nil
 }
