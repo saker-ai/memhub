@@ -1,6 +1,10 @@
 <template>
-  <section class="px-4 pt-2 pb-10 lg:px-6 md:pt-4 md:pb-12 max-w-2xl">
-    <form @submit.prevent="handleSubmit">
+  <section class="relative px-4 pt-2 pb-10 lg:px-6 md:pt-4 md:pb-12 max-w-2xl">
+    <form
+      :aria-busy="isCreateFlowBlocked"
+      :class="{ 'pointer-events-none select-none opacity-60': isCreateFlowBlocked }"
+      @submit.prevent="handleSubmit"
+    >
       <!-- Basic Info -->
       <div>
         <h3 class="text-sm font-medium mb-4">
@@ -224,19 +228,39 @@
         <Button
           type="button"
           variant="outline"
+          :disabled="isCreateFlowBlocked"
           @click="router.back()"
         >
           {{ $t('common.cancel') }}
         </Button>
         <Button
           type="submit"
-          :disabled="!canSubmit || submitLoading"
+          :disabled="!canSubmit || isCreateFlowBlocked"
         >
-          <Spinner v-if="submitLoading" />
-          {{ $t('bots.createBot') }}
+          <Spinner v-if="isCreateFlowBlocked" />
+          {{ isCreateFlowBlocked ? $t('bots.createBotSettingUp') : $t('bots.createBot') }}
         </Button>
       </div>
     </form>
+
+    <div
+      v-if="isCreateFlowBlocked"
+      class="absolute inset-0 z-10 flex items-start justify-center bg-background/70 pt-20 backdrop-blur-[1px]"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex max-w-md items-start gap-3 rounded-md border bg-background px-4 py-3 shadow-sm">
+        <Spinner class="mt-0.5 shrink-0" />
+        <div class="min-w-0">
+          <p class="text-sm font-medium">
+            {{ $t('bots.createBotSetupTitle') }}
+          </p>
+          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {{ $t('bots.createBotSetupDesc') }}
+          </p>
+        </div>
+      </div>
+    </div>
 
     <AvatarEditDialog
       v-model:open="avatarDialogOpen"
@@ -392,8 +416,10 @@ const { mutateAsync: createBot, isLoading: submitLoading } = useMutation({
   onSettled: () => queryCache.invalidateQueries({ key: getBotsQueryKey() }),
 })
 
+const isCreateFlowBlocked = computed(() => submitLoading.value)
+
 async function handleSubmit() {
-  if (!canSubmit.value || submitLoading.value) return
+  if (!canSubmit.value || isCreateFlowBlocked.value) return
 
   const metadata = localWorkspaceEnabled.value && form.workspace_backend === 'local'
     ? {
@@ -415,6 +441,7 @@ async function handleSubmit() {
         is_active: true,
         acl_preset: form.acl_preset,
         metadata,
+        wait_for_ready: true,
       },
     })
 

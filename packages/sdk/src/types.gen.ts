@@ -469,6 +469,7 @@ export type BotsCreateBotRequest = {
         [key: string]: unknown;
     };
     timezone?: string;
+    wait_for_ready?: boolean;
 };
 
 export type BotsListBotsResponse = {

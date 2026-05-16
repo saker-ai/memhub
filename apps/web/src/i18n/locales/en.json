@@ -935,6 +935,9 @@
     "createBot": "New Bot",
     "createBotWaitHint": "First-time creation may pull base images and take a moment.",
     "createBotSuccess": "Bot created successfully.",
+    "createBotSettingUp": "Setting up...",
+    "createBotSetupTitle": "Setting up bot",
+    "createBotSetupDesc": "Creating the bot and workspace container. The page will open it automatically when it is ready.",
     "steps": {
       "basicInfo": "Basic Info",
       "basicInfoDesc": "Name and avatar",

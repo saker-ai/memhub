@@ -10668,6 +10668,9 @@ const docTemplate = `{
                 },
                 "timezone": {
                     "type": "string"
+                },
+                "wait_for_ready": {
+                    "type": "boolean"
                 }
             }
         },

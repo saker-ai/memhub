@@ -35,12 +35,13 @@ type BotCheck struct {
 
 // CreateBotRequest is the input for creating a bot.
 type CreateBotRequest struct {
-	DisplayName string         `json:"display_name,omitempty"`
-	AvatarURL   string         `json:"avatar_url,omitempty"`
-	Timezone    *string        `json:"timezone,omitempty"`
-	IsActive    *bool          `json:"is_active,omitempty"`
-	AclPreset   string         `json:"acl_preset,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	DisplayName  string         `json:"display_name,omitempty"`
+	AvatarURL    string         `json:"avatar_url,omitempty"`
+	Timezone     *string        `json:"timezone,omitempty"`
+	IsActive     *bool          `json:"is_active,omitempty"`
+	AclPreset    string         `json:"acl_preset,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
+	WaitForReady bool           `json:"wait_for_ready,omitempty"`
 }
 
 // UpdateBotRequest is the input for updating a bot.

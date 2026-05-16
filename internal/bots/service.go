@@ -155,6 +155,13 @@ func (s *Service) Create(ctx context.Context, ownerUserID string, req CreateBotR
 	if err := s.attachCheckSummary(ctx, &bot, asSQLCBot(row)); err != nil {
 		return Bot{}, err
 	}
+	if req.WaitForReady {
+		waitCtx := context.WithoutCancel(ctx)
+		if err := s.runCreateLifecycle(waitCtx, bot.ID); err != nil {
+			return Bot{}, err
+		}
+		return s.Get(waitCtx, bot.ID)
+	}
 	s.enqueueCreateLifecycle(ctx, bot.ID)
 	return bot, nil
 }
@@ -358,25 +365,36 @@ func (s *Service) ListChecks(ctx context.Context, botID string) ([]BotCheck, err
 
 func (s *Service) enqueueCreateLifecycle(ctx context.Context, botID string) {
 	go func() {
-		lifecycleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), botLifecycleOperationTimeout)
-		defer cancel()
-
-		if s.containerLifecycle != nil {
-			if err := s.containerLifecycle.SetupBotContainer(lifecycleCtx, botID); err != nil {
-				s.logger.Error("bot container setup failed",
-					slog.String("bot_id", botID),
-					slog.Any("error", err),
-				)
-			}
-		}
-
-		if err := s.updateStatus(lifecycleCtx, botID, BotStatusReady); err != nil {
-			s.logger.Error("failed to update bot status to ready after create",
+		if err := s.runCreateLifecycle(context.WithoutCancel(ctx), botID); err != nil {
+			s.logger.Error("bot create lifecycle failed",
 				slog.String("bot_id", botID),
 				slog.Any("error", err),
 			)
 		}
 	}()
+}
+
+func (s *Service) runCreateLifecycle(ctx context.Context, botID string) error {
+	lifecycleCtx, cancel := context.WithTimeout(ctx, botLifecycleOperationTimeout)
+	defer cancel()
+
+	if s.containerLifecycle != nil {
+		if err := s.containerLifecycle.SetupBotContainer(lifecycleCtx, botID); err != nil {
+			s.logger.Error("bot container setup failed",
+				slog.String("bot_id", botID),
+				slog.Any("error", err),
+			)
+		}
+	}
+
+	if err := s.updateStatus(lifecycleCtx, botID, BotStatusReady); err != nil {
+		s.logger.Error("failed to update bot status to ready after create",
+			slog.String("bot_id", botID),
+			slog.Any("error", err),
+		)
+		return err
+	}
+	return nil
 }
 
 func (s *Service) enqueueDeleteLifecycle(ctx context.Context, botID string) {

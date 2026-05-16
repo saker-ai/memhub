@@ -931,6 +931,9 @@
     "createBot": "新建 Bot",
     "createBotWaitHint": "首次创建可能需要拉取基础镜像，请耐心等待。",
     "createBotSuccess": "Bot 创建成功。",
+    "createBotSettingUp": "正在准备...",
+    "createBotSetupTitle": "正在准备 Bot",
+    "createBotSetupDesc": "正在创建 Bot 和工作区容器。准备完成后会自动打开这个 Bot。",
     "steps": {
       "basicInfo": "基本信息",
       "basicInfoDesc": "名称和头像",

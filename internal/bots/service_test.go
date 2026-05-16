@@ -27,9 +27,13 @@ func (r *fakeRow) Scan(dest ...any) error {
 // fakeDBTX implements sqlc.DBTX for unit testing.
 type fakeDBTX struct {
 	queryRowFunc func(ctx context.Context, sql string, args ...any) pgx.Row
+	execFunc     func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
-func (*fakeDBTX) Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error) {
+func (d *fakeDBTX) Exec(ctx context.Context, sql string, args ...interface{}) (pgconn.CommandTag, error) {
+	if d.execFunc != nil {
+		return d.execFunc(ctx, sql, args...)
+	}
 	return pgconn.CommandTag{}, nil
 }
 
@@ -89,6 +93,24 @@ func mustParseUUID(s string) pgtype.UUID {
 	var u pgtype.UUID
 	_ = u.Scan(s)
 	return u
+}
+
+type fakeContainerLifecycle struct {
+	onSetup    func()
+	setupBotID string
+	setupErr   error
+}
+
+func (f *fakeContainerLifecycle) SetupBotContainer(_ context.Context, botID string) error {
+	if f.onSetup != nil {
+		f.onSetup()
+	}
+	f.setupBotID = botID
+	return f.setupErr
+}
+
+func (*fakeContainerLifecycle) CleanupBotContainer(context.Context, string, bool) error {
+	return nil
 }
 
 func TestAuthorizeAccess(t *testing.T) {
@@ -178,5 +200,43 @@ func TestCreateRejectsUnknownACLPreset(t *testing.T) {
 	}
 	if createCalled {
 		t.Fatal("bot row should not be created when acl preset is invalid")
+	}
+}
+
+func TestRunCreateLifecycleSetsUpContainerBeforeReady(t *testing.T) {
+	botUUID := mustParseUUID("00000000-0000-0000-0000-000000000002")
+	botID := botUUID.String()
+	events := make([]string, 0, 2)
+
+	db := &fakeDBTX{
+		execFunc: func(_ context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+			if strings.Contains(sql, "UPDATE bots") && strings.Contains(sql, "SET status = $2") {
+				events = append(events, "status")
+				if got := args[0].(pgtype.UUID); got != botUUID {
+					t.Fatalf("expected status update for %s, got %s", botUUID, got)
+				}
+				if got := args[1].(string); got != BotStatusReady {
+					t.Fatalf("expected status %q, got %q", BotStatusReady, got)
+				}
+			}
+			return pgconn.CommandTag{}, nil
+		},
+	}
+	lifecycle := &fakeContainerLifecycle{
+		onSetup: func() {
+			events = append(events, "setup")
+		},
+	}
+	svc := NewService(nil, postgresstore.NewQueries(sqlc.New(db)))
+	svc.SetContainerLifecycle(lifecycle)
+
+	if err := svc.runCreateLifecycle(context.Background(), botID); err != nil {
+		t.Fatalf("run create lifecycle: %v", err)
+	}
+	if lifecycle.setupBotID != botID {
+		t.Fatalf("expected setup for bot %s, got %s", botID, lifecycle.setupBotID)
+	}
+	if len(events) != 2 || events[0] != "setup" || events[1] != "status" {
+		t.Fatalf("expected setup before ready status update, got events %v", events)
 	}
 }
