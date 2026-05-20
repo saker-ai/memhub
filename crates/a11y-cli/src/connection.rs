@@ -102,6 +102,46 @@ pub fn current_bus_address() -> Option<String> {
     env::var("AT_SPI_BUS_ADDRESS").ok()
 }
 
+/// Extract the filesystem path from a `unix:path=...` style bus address.
+/// Returns `None` for abstract sockets or non-unix transports.
+pub(crate) fn unix_path_from_address(addr: &str) -> Option<&str> {
+    addr.split(',')
+        .find_map(|part| part.strip_prefix("unix:path="))
+}
+
+/// Parse the numeric part of an X11 DISPLAY string (e.g. `":99.0"` → `"99"`).
+/// Defaults to `"0"` when the value is missing or unparsable.
+pub(crate) fn display_number(display: Option<&str>) -> String {
+    display
+        .map(|d| d.trim_start_matches(':').split('.').next().unwrap_or("0"))
+        .filter(|d| !d.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| "0".to_string())
+}
+
+/// Build the ordered list of socket paths to probe when `/proc` discovery
+/// turns up nothing. Kept pure so unit tests can validate the order without
+/// touching the real environment.
+pub(crate) fn candidate_paths(
+    display_id: &str,
+    xdg_runtime: Option<&str>,
+    home: Option<&str>,
+) -> Vec<PathBuf> {
+    let leaf = format!("at-spi/bus_{display_id}");
+    let mut paths: Vec<PathBuf> = Vec::new();
+    if let Some(runtime) = xdg_runtime {
+        paths.push(PathBuf::from(runtime).join(&leaf));
+        paths.push(PathBuf::from(runtime).join("at-spi/bus"));
+    }
+    if let Some(home) = home {
+        paths.push(PathBuf::from(home).join(".cache").join(&leaf));
+    }
+    paths.push(PathBuf::from("/data/.cache").join(&leaf));
+    paths.push(PathBuf::from("/root/.cache").join(&leaf));
+    paths.push(PathBuf::from("/tmp").join(&leaf));
+    paths
+}
+
 /// True when an AT-SPI bus address actually accepts a Unix socket connection.
 ///
 /// `Path::exists()` alone is not enough: a dbus-daemon can crash leaving a
@@ -113,10 +153,7 @@ fn address_socket_alive(addr: &str) -> bool {
     use std::os::unix::net::UnixStream;
     // Abstract sockets are not visible on the filesystem; trust them and let
     // zbus surface any error.
-    let path = match addr
-        .split(',')
-        .find_map(|part| part.strip_prefix("unix:path="))
-    {
+    let path = match unix_path_from_address(addr) {
         Some(p) => p,
         None => return true,
     };
@@ -145,28 +182,10 @@ fn discover_bus_address() -> Option<String> {
         }
     }
 
-    let display_id = env::var("DISPLAY")
-        .ok()
-        .and_then(|d| {
-            d.trim_start_matches(':')
-                .split('.')
-                .next()
-                .map(str::to_string)
-        })
-        .unwrap_or_else(|| "0".to_string());
-    let leaf = format!("at-spi/bus_{}", display_id);
-
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Ok(runtime) = env::var("XDG_RUNTIME_DIR") {
-        candidates.push(PathBuf::from(&runtime).join(&leaf));
-        candidates.push(PathBuf::from(&runtime).join("at-spi/bus"));
-    }
-    if let Ok(home) = env::var("HOME") {
-        candidates.push(PathBuf::from(&home).join(".cache").join(&leaf));
-    }
-    candidates.push(PathBuf::from("/data/.cache").join(&leaf));
-    candidates.push(PathBuf::from("/root/.cache").join(&leaf));
-    candidates.push(PathBuf::from("/tmp").join(&leaf));
+    let display_id = display_number(env::var("DISPLAY").ok().as_deref());
+    let xdg_runtime = env::var("XDG_RUNTIME_DIR").ok();
+    let home = env::var("HOME").ok();
+    let candidates = candidate_paths(&display_id, xdg_runtime.as_deref(), home.as_deref());
 
     for path in candidates {
         if path.exists() {
@@ -313,4 +332,80 @@ pub async fn text_for<'a>(
         .build()
         .await
         .context("failed to build text proxy")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unix_path_extracts_plain_address() {
+        assert_eq!(
+            unix_path_from_address("unix:path=/tmp/at-spi/bus_99"),
+            Some("/tmp/at-spi/bus_99")
+        );
+    }
+
+    #[test]
+    fn unix_path_handles_keyed_address() {
+        // dbus addresses may carry extra key=value pairs separated by commas.
+        assert_eq!(
+            unix_path_from_address("unix:path=/run/foo,guid=abcd"),
+            Some("/run/foo")
+        );
+        assert_eq!(
+            unix_path_from_address("guid=abcd,unix:path=/run/foo"),
+            Some("/run/foo")
+        );
+    }
+
+    #[test]
+    fn unix_path_returns_none_for_abstract_or_tcp() {
+        assert_eq!(unix_path_from_address("unix:abstract=/tmp/foo"), None);
+        assert_eq!(unix_path_from_address("tcp:host=127.0.0.1,port=4242"), None);
+    }
+
+    #[test]
+    fn display_number_strips_colon_and_screen() {
+        assert_eq!(display_number(Some(":99")), "99");
+        assert_eq!(display_number(Some(":99.0")), "99");
+        assert_eq!(display_number(Some(":0")), "0");
+    }
+
+    #[test]
+    fn display_number_falls_back_to_zero() {
+        assert_eq!(display_number(None), "0");
+        assert_eq!(display_number(Some("")), "0");
+    }
+
+    #[test]
+    fn candidate_paths_orders_runtime_then_home_then_globals() {
+        let paths = candidate_paths("99", Some("/run/user/1000"), Some("/home/me"));
+        let as_strs: Vec<String> = paths.iter().map(|p| p.display().to_string()).collect();
+        assert_eq!(
+            as_strs,
+            vec![
+                "/run/user/1000/at-spi/bus_99",
+                "/run/user/1000/at-spi/bus",
+                "/home/me/.cache/at-spi/bus_99",
+                "/data/.cache/at-spi/bus_99",
+                "/root/.cache/at-spi/bus_99",
+                "/tmp/at-spi/bus_99",
+            ]
+        );
+    }
+
+    #[test]
+    fn candidate_paths_skips_unset_runtime_and_home() {
+        let paths = candidate_paths("7", None, None);
+        let as_strs: Vec<String> = paths.iter().map(|p| p.display().to_string()).collect();
+        assert_eq!(
+            as_strs,
+            vec![
+                "/data/.cache/at-spi/bus_7",
+                "/root/.cache/at-spi/bus_7",
+                "/tmp/at-spi/bus_7",
+            ]
+        );
+    }
 }

@@ -105,3 +105,121 @@ pub fn normalize(ref_id: &str) -> String {
         _ => trimmed.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static REFS_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    /// Return a unique refs path in the OS temp dir so concurrent tests do
+    /// not stomp on each other's `A11Y_CLI_REFS` env value.
+    fn unique_refs_path() -> PathBuf {
+        let pid = std::process::id();
+        let n = REFS_COUNTER.fetch_add(1, Ordering::SeqCst);
+        std::env::temp_dir().join(format!("a11y-cli-refs-test-{pid}-{n}.json"))
+    }
+
+    fn sample_entry() -> RefEntry {
+        RefEntry {
+            ref_id: "e1".to_string(),
+            bus_name: ":1.42".to_string(),
+            object_path: "/org/a11y/atspi/accessible/root".to_string(),
+            role: "push button".to_string(),
+            name: "Reload".to_string(),
+            x: 100,
+            y: 50,
+            width: 30,
+            height: 20,
+        }
+    }
+
+    #[test]
+    fn normalize_accepts_canonical_form() {
+        assert_eq!(normalize("e3"), "e3");
+    }
+
+    #[test]
+    fn normalize_uppercases_and_strips_padding() {
+        assert_eq!(normalize("  E3  "), "e3");
+        assert_eq!(normalize("E03"), "e3");
+    }
+
+    #[test]
+    fn normalize_handles_bare_numbers() {
+        assert_eq!(normalize("3"), "e3");
+        assert_eq!(normalize("007"), "e7");
+    }
+
+    #[test]
+    fn normalize_strips_ref_prefix() {
+        assert_eq!(normalize("ref=e3"), "e3");
+        assert_eq!(normalize("REF=E03"), "e3");
+        assert_eq!(normalize("ref=7"), "e7");
+    }
+
+    #[test]
+    fn normalize_falls_back_for_invalid_inputs() {
+        assert_eq!(normalize("e0"), "e0");
+        assert_eq!(normalize("abc"), "abc");
+        assert_eq!(normalize(""), "");
+    }
+
+    #[test]
+    fn center_returns_midpoint_of_bounding_box() {
+        let entry = RefEntry {
+            x: 100,
+            y: 50,
+            width: 40,
+            height: 20,
+            ..sample_entry()
+        };
+        assert_eq!(entry.center(), (120, 60));
+    }
+
+    #[test]
+    fn center_handles_zero_dimensions() {
+        let entry = RefEntry {
+            x: 10,
+            y: 20,
+            width: 0,
+            height: 0,
+            ..sample_entry()
+        };
+        assert_eq!(entry.center(), (10, 20));
+    }
+
+    #[test]
+    fn write_and_lookup_roundtrip() {
+        let path = unique_refs_path();
+        // SAFETY: tests are single-threaded with regard to this env var
+        // because each test invocation uses a unique path.
+        unsafe { std::env::set_var("A11Y_CLI_REFS", &path) };
+        let entries = vec![
+            RefEntry {
+                ref_id: "e1".to_string(),
+                ..sample_entry()
+            },
+            RefEntry {
+                ref_id: "e2".to_string(),
+                name: "Stop".to_string(),
+                ..sample_entry()
+            },
+        ];
+        let written = write(&entries).expect("write should succeed");
+        assert_eq!(written, path);
+
+        let entry = lookup("e2").expect("lookup should find e2");
+        assert_eq!(entry.ref_id, "e2");
+        assert_eq!(entry.name, "Stop");
+
+        let entry = lookup("REF=E1").expect("lookup should accept normalized form");
+        assert_eq!(entry.ref_id, "e1");
+
+        assert!(lookup("e99").is_err(), "missing refs should error");
+
+        let _ = std::fs::remove_file(&path);
+        unsafe { std::env::remove_var("A11Y_CLI_REFS") };
+    }
+}

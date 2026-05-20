@@ -154,3 +154,52 @@ async fn try_fill(entry: &RefEntry, text: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn action(name: &str) -> atspi::Action {
+        atspi::Action {
+            name: name.to_string(),
+            description: String::new(),
+            keybinding: String::new(),
+        }
+    }
+
+    #[test]
+    fn preferred_index_picks_click_first() {
+        let descriptors = [action("focus"), action("click"), action("press")];
+        assert_eq!(preferred_action_index(&descriptors), 1);
+    }
+
+    #[test]
+    fn preferred_index_matches_press_when_no_click() {
+        let descriptors = [action("focus"), action("press"), action("activate")];
+        assert_eq!(preferred_action_index(&descriptors), 1);
+    }
+
+    #[test]
+    fn preferred_index_matches_activate_when_no_click_or_press() {
+        let descriptors = [action("focus"), action("activate")];
+        assert_eq!(preferred_action_index(&descriptors), 1);
+    }
+
+    #[test]
+    fn preferred_index_is_case_insensitive() {
+        let descriptors = [action("Focus"), action("CLICK")];
+        assert_eq!(preferred_action_index(&descriptors), 1);
+    }
+
+    #[test]
+    fn preferred_index_falls_back_to_zero() {
+        let descriptors = [action("focus"), action("describe")];
+        assert_eq!(preferred_action_index(&descriptors), 0);
+    }
+
+    #[test]
+    fn preferred_index_handles_empty_descriptors() {
+        let descriptors: [atspi::Action; 0] = [];
+        assert_eq!(preferred_action_index(&descriptors), 0);
+    }
+}

@@ -281,3 +281,70 @@ fn role_is_structural(role: Role) -> bool {
             | Role::DesktopIcon
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(role: &str, name: &str, x: i32, y: i32, w: i32, h: i32) -> RefEntry {
+        RefEntry {
+            ref_id: "e3".to_string(),
+            bus_name: ":1.42".to_string(),
+            object_path: "/org/a11y/atspi/accessible/3".to_string(),
+            role: role.to_string(),
+            name: name.to_string(),
+            x,
+            y,
+            width: w,
+            height: h,
+        }
+    }
+
+    #[test]
+    fn format_line_emits_role_name_ref_and_geometry() {
+        let line = format_line(&entry("push button", "Reload", 120, 80, 28, 28));
+        assert_eq!(line, "- push button \"Reload\" [ref=e3] @120,80 28x28");
+    }
+
+    #[test]
+    fn format_line_omits_name_when_blank() {
+        let line = format_line(&entry("scroll bar", "   ", 10, 20, 4, 100));
+        assert_eq!(line, "- scroll bar [ref=e3] @10,20 4x100");
+    }
+
+    #[test]
+    fn format_line_omits_geometry_when_unknown() {
+        let line = format_line(&entry("link", "Help", 0, 0, 0, 0));
+        assert_eq!(line, "- link \"Help\" [ref=e3]");
+    }
+
+    #[test]
+    fn format_line_escapes_quotes_in_name() {
+        let line = format_line(&entry("button", "Say \"hi\"", 1, 2, 3, 4));
+        // serde_json escapes inner quotes, keeping the outer quoting valid.
+        assert_eq!(line, "- button \"Say \\\"hi\\\"\" [ref=e3] @1,2 3x4");
+    }
+
+    #[test]
+    fn json_quote_escapes_special_chars() {
+        assert_eq!(json_quote("hello"), "\"hello\"");
+        assert_eq!(json_quote("with \"quote\""), "\"with \\\"quote\\\"\"");
+        assert_eq!(json_quote("line\nbreak"), "\"line\\nbreak\"");
+    }
+
+    #[test]
+    fn structural_roles_are_filtered() {
+        assert!(role_is_structural(Role::Filler));
+        assert!(role_is_structural(Role::Separator));
+        assert!(role_is_structural(Role::Application));
+        assert!(role_is_structural(Role::DesktopFrame));
+    }
+
+    #[test]
+    fn actionable_roles_pass_through() {
+        assert!(!role_is_structural(Role::Button));
+        assert!(!role_is_structural(Role::Link));
+        assert!(!role_is_structural(Role::Entry));
+        assert!(!role_is_structural(Role::CheckBox));
+    }
+}
