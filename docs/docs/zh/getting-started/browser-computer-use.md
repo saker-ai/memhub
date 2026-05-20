@@ -8,7 +8,7 @@ Memoh 可以在机器人 workspace 容器里启动一个可见桌面和有头浏
 |------|------|----------|
 | Headless browser 命令 | 快速脚本化网页自动化 | 在 workspace 里正常运行 Playwright 或其它浏览器工具。 |
 | Browser Use | 网页、表单、导航、截图、可访问性树检查 | 通过 CDP 操作 workspace 里的有头 Chrome/Chromium。 |
-| Computer Use | 原生弹窗、浏览器状态坏掉、非浏览器 GUI、坐标级恢复 | 通过桌面截图加鼠标/键盘输入操作。 |
+| Computer Use | 原生弹窗、浏览器状态坏掉、非浏览器 GUI | 读取桌面无障碍树（AT-SPI）拿到 ref，无法解析时回退到坐标与截图。 |
 
 网页内操作优先用 Browser Use。只有遇到 CDP 够不到的 GUI 状态时，再用 Computer Use。
 
@@ -31,10 +31,19 @@ Display runtime 会安装或使用桌面、VNC server、浏览器和字体等组
 
 workspace desktop 启用后，agent 可以使用浏览器和电脑操作工具：
 
-- `browser_observe` 检查当前浏览器页面。
+- `browser_observe` 检查当前浏览器页面（snapshot、get_content、screenshot、evaluate 等）。
 - `browser_action` 在有头浏览器里点击、填表、输入、按键、导航。
 - `browser_remote_session` 暴露浏览器 CDP endpoint，给代码驱动的会话使用。
-- `computer_use` 截图，并向桌面发送鼠标或键盘输入。
+- `computer_observe` 返回桌面无障碍树快照（ref 如 `e3`）或者一张落盘截图的路径。
+- `computer_action` 操作桌面：优先使用快照里的 `ref`；当 ref 不可用或无障碍调用失败时回退到 `(x, y)` 坐标。
+
+### 截图不再自动注入对话
+
+`browser_observe` 与 `computer_observe` 的截图会落盘到 workspace 路径（如 `/data/computer-screenshots/1716200000.jpg`），工具结果只返回这个路径，不再自动塞到对话里。需要查看图像时显式调用文件读取工具读这个路径，可以让观察成本变低，也把“是否值得花 token 读图”交回模型决定。
+
+### 无障碍辅助二进制
+
+Computer Use 依赖容器内 `/opt/memoh/toolkit/display/bin/a11y-cli` 以及 workspace 的 `at-spi2-core` 包。Display runtime probe 会返回 `a11y_available`，便于 Web UI 显示无障碍路径是否健康。AT-SPI 不可用时，`computer_action` 仍可用坐标驱动，`computer_observe screenshot` 仍然可用。
 
 这些是 workspace runtime 能力，不是用来自动化 Electron 桌面 App 本身的。
 

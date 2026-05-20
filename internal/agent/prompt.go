@@ -130,6 +130,8 @@ func GenerateSystemPrompt(params SystemPromptParams) string {
 		"- `exec`: execute command",
 	)
 
+	displayTools := buildDisplayToolsSection(params.DisplayEnabled)
+
 	skillsSection := buildSkillsSection(params.Skills)
 
 	fileSections := ""
@@ -149,6 +151,7 @@ func GenerateSystemPrompt(params SystemPromptParams) string {
 		"currentTime":               now.Format(time.RFC3339),
 		"timezone":                  timezoneName,
 		"basicTools":                strings.Join(basicTools, "\n"),
+		"displayTools":              displayTools,
 		"skillsSection":             skillsSection,
 		"platformIdentitiesSection": strings.TrimSpace(params.PlatformIdentitiesSection),
 		"fileSections":              fileSections,
@@ -163,7 +166,24 @@ type SystemPromptParams struct {
 	Now                       time.Time
 	Timezone                  string
 	SupportsImageInput        bool
+	DisplayEnabled            bool
 	PlatformIdentitiesSection string
+}
+
+func buildDisplayToolsSection(enabled bool) string {
+	if !enabled {
+		return ""
+	}
+	return strings.TrimSpace(`
+## Workspace browser & desktop
+
+This bot has a headed workspace display (Chrome on a virtual desktop). Use GUI tools only when the task needs on-screen interaction:
+
+- **Browser** (browser_observe, browser_action): Web pages in Chrome. Observe before acting; prefer element refs from snapshot over CSS selectors.
+- **Computer** (computer_observe, computer_action): Whole-desktop fallback for native dialogs, non-browser apps, or when the browser path fails. Start with computer_observe snapshot to get an accessibility tree with element refs, then drive computer_action with those refs; raw coordinates are a last-resort fallback.
+- **browser_remote_session**: Only when running Playwright or other CDP automation inside the workspace is clearly better than the browser tools above.
+- **Screenshots**: Both browser_observe and computer_observe save screenshots to a workspace path; they are not attached to the conversation. Read the returned path with the file read tool when you need the image.
+`)
 }
 
 // GenerateSchedulePrompt builds the user message for a scheduled task trigger.

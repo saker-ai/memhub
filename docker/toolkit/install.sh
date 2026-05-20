@@ -404,6 +404,14 @@ display_bundle_installed() {
   [ -x "$DISPLAY_OUTDIR/root/usr/bin/xterm" ] || return 1
 
   write_display_wrappers
+
+  # The bundle is Linux musl ELF. Skip exec-based smoke checks when assembling
+  # from a non-Linux host (e.g. running install.sh from macOS via Docker); the
+  # wrappers will be exercised inside the workspace container at runtime.
+  if [ "$(uname -s)" != "Linux" ]; then
+    return 0
+  fi
+
   "$DISPLAY_OUTDIR/bin/Xvnc" -version >/dev/null 2>&1 || return 1
   "$DISPLAY_OUTDIR/bin/xkbcomp" -version >/dev/null 2>&1 || return 1
   "$DISPLAY_OUTDIR/bin/xsetroot" -version >/dev/null 2>&1 || return 1
@@ -493,6 +501,56 @@ install_display_bundle() {
   echo "Display bundle installed to $DISPLAY_OUTDIR"
 }
 
+is_linux_elf() {
+  [ -r "$1" ] || return 1
+  magic="$(dd if="$1" bs=1 count=4 2>/dev/null | LC_ALL=C od -An -tx1 | tr -d ' \n')"
+  [ "$magic" = "7f454c46" ]
+}
+
+install_a11y_cli() {
+  dest_dir="$DISPLAY_OUTDIR/bin"
+  dest_path="$dest_dir/a11y-cli"
+  if [ -x "$dest_path" ] && is_linux_elf "$dest_path"; then
+    return
+  fi
+  if [ -e "$dest_path" ] && ! is_linux_elf "$dest_path"; then
+    echo "Removing non-Linux a11y-cli at $dest_path"
+    rm -f "$dest_path"
+  fi
+  mkdir -p "$dest_dir"
+
+  # Honor an explicit override so cross-arch release pipelines can drop a
+  # prebuilt Linux binary into place.
+  if [ -n "${MEMOH_A11Y_CLI_BINARY:-}" ] && is_linux_elf "$MEMOH_A11Y_CLI_BINARY"; then
+    cp "$MEMOH_A11Y_CLI_BINARY" "$dest_path"
+    chmod +x "$dest_path"
+    echo "a11y-cli installed from $MEMOH_A11Y_CLI_BINARY"
+    return
+  fi
+
+  # Prefer the cross-built Linux binary produced by `mise run a11y-cli:build`.
+  # `target/release/a11y-cli` is only safe when the host itself is Linux,
+  # otherwise it is the macOS/Windows host build and would crash inside the
+  # workspace container with "Exec format error".
+  for candidate in \
+    "target/linux/release/a11y-cli" \
+    "target/release/a11y-cli" \
+    "target/x86_64-unknown-linux-gnu/release/a11y-cli" \
+    "target/aarch64-unknown-linux-gnu/release/a11y-cli" \
+    "target/x86_64-unknown-linux-musl/release/a11y-cli" \
+    "target/aarch64-unknown-linux-musl/release/a11y-cli"; do
+    if is_linux_elf "$candidate"; then
+      cp "$candidate" "$dest_path"
+      chmod +x "$dest_path"
+      echo "a11y-cli installed from $candidate"
+      return
+    fi
+  done
+
+  echo "warning: no Linux a11y-cli release binary found." >&2
+  echo "         Run 'mise run a11y-cli:build' or set MEMOH_A11Y_CLI_BINARY to a Linux ELF." >&2
+}
+
 mkdir -p "$OUTDIR/node-glibc" "$OUTDIR/node-musl"
 
 install_node_glibc
@@ -506,3 +564,4 @@ install_uv
 
 echo "Toolkit installed to $OUTDIR"
 install_display_bundle
+install_a11y_cli

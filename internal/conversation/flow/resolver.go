@@ -586,6 +586,7 @@ func (r *Resolver) buildBaseRunConfig(ctx context.Context, p baseRunConfigParams
 		SessionType:        p.SessionType,
 		SupportsImageInput: chatModel.HasCompatibility(models.CompatVision),
 		SupportsToolCall:   chatModel.HasCompatibility(models.CompatToolCall),
+		DisplayEnabled:     botSettings.DisplayEnabled,
 		Identity: agentpkg.SessionContext{
 			BotID:             p.BotID,
 			ChatID:            chatID,
@@ -755,6 +756,7 @@ func (r *Resolver) prepareRunConfig(ctx context.Context, cfg agentpkg.RunConfig)
 		Now:                       now,
 		Timezone:                  cfg.Identity.Timezone,
 		SupportsImageInput:        supportsImageInput,
+		DisplayEnabled:            cfg.DisplayEnabled,
 		PlatformIdentitiesSection: platformIdentitiesSection,
 	})
 

@@ -30,6 +30,7 @@ type displayInfoResponse struct {
 	DesktopAvailable  bool   `json:"desktop_available"`
 	BrowserAvailable  bool   `json:"browser_available"`
 	ToolkitAvailable  bool   `json:"toolkit_available"`
+	A11yAvailable     bool   `json:"a11y_available"`
 	PrepareSupported  bool   `json:"prepare_supported"`
 	PrepareSystem     string `json:"prepare_system,omitempty"`
 	UnavailableReason string `json:"unavailable_reason,omitempty"`
@@ -59,6 +60,7 @@ type displayRuntimeProbe struct {
 	DesktopAvailable bool   `json:"desktop_available"`
 	BrowserAvailable bool   `json:"browser_available"`
 	VNCAvailable     bool   `json:"vnc_available"`
+	A11yAvailable    bool   `json:"a11y_available"`
 }
 
 // GetDisplayInfo godoc
@@ -106,6 +108,7 @@ func (h *ContainerdHandler) GetDisplayInfo(c echo.Context) error {
 				resp.PrepareSystem = probe.PrepareSystem
 				resp.DesktopAvailable = probe.DesktopAvailable
 				resp.BrowserAvailable = probe.BrowserAvailable
+				resp.A11yAvailable = probe.A11yAvailable
 				if !resp.Running && !probe.VNCAvailable {
 					resp.UnavailableReason = "display bundle unavailable"
 				}
@@ -692,7 +695,7 @@ if ! browser_cdp_running; then
     stop_browsers
   fi
   cleanup_browser_profile
-  nohup "$BROWSER" --no-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run --no-default-browser-check --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --remote-allow-origins='*' --user-data-dir=/tmp/memoh-display-browser about:blank >/tmp/memoh-browser.log 2>&1 &
+  GTK_A11Y=1 nohup "$BROWSER" --no-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run --no-default-browser-check --force-renderer-accessibility --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --remote-allow-origins='*' --user-data-dir=/tmp/memoh-display-browser about:blank >/tmp/memoh-browser.log 2>&1 &
 fi
 
 complete
@@ -745,13 +748,19 @@ has_browser() {
     has_cmd chromium-browser ||
     has_process 'google-chrome|chromium'
 }
-printf '{"toolkit_available":%s,"prepare_supported":%s,"prepare_system":"%s","desktop_available":%s,"browser_available":%s,"vnc_available":%s}\n' \
+has_a11y() {
+  a11y=/opt/memoh/toolkit/display/bin/a11y-cli
+  [ -x "$a11y" ] || return 1
+  DISPLAY=:99 "$a11y" probe 2>/dev/null | grep -q '"ok":true'
+}
+printf '{"toolkit_available":%s,"prepare_supported":%s,"prepare_system":"%s","desktop_available":%s,"browser_available":%s,"vnc_available":%s,"a11y_available":%s}\n' \
   "$(json_bool has_toolkit)" \
   "$(json_bool has_prepare)" \
   "$os_id" \
   "$(json_bool has_desktop)" \
   "$(json_bool has_browser)" \
-  "$(json_bool has_vnc)"`
+  "$(json_bool has_vnc)" \
+  "$(json_bool has_a11y)"`
 
 func probeDisplayRuntime(ctx context.Context, client *bridge.Client) (displayRuntimeProbe, bool) {
 	var probe displayRuntimeProbe

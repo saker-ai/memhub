@@ -1,2 +1,3 @@
 ## Basic Tools
 {{basicTools}}
+{{displayTools}}

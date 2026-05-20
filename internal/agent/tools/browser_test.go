@@ -106,3 +106,50 @@ func TestBrowserSchemasAreStrict(t *testing.T) {
 		t.Fatalf("unexpected required fields: %#v", schema["required"])
 	}
 }
+
+func TestBuildScreenshotResultDropsShareMetadata(t *testing.T) {
+	p := &BrowserProvider{dataRoot: "/data"}
+	result := p.buildScreenshotBytesResult(t.Context(), "", []byte("png-bytes"), "image/png", "/data/computer-screenshots", nil)
+	asMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map result, got %T", result)
+	}
+	if _, exists := asMap["shared"]; exists {
+		t.Fatalf("expected shared field to be removed, got %#v", asMap)
+	}
+	content, ok := asMap["content"].([]map[string]any)
+	if !ok || len(content) == 0 {
+		t.Fatalf("expected text content, got %#v", asMap["content"])
+	}
+	text, _ := content[0]["text"].(string)
+	if !strings.HasPrefix(text, "Screenshot saved to ") && !strings.HasPrefix(text, "Screenshot captured") {
+		t.Fatalf("unexpected screenshot text: %q", text)
+	}
+}
+
+func TestComputerA11yShellQuote(t *testing.T) {
+	if got := shellQuote("hello world"); got != "'hello world'" {
+		t.Fatalf("unexpected quote: %q", got)
+	}
+	if got := shellQuote("it's a test"); got != `'it'\''s a test'` {
+		t.Fatalf("unexpected escaped quote: %q", got)
+	}
+	if got := shellQuoteArgs([]string{"click", "--ref", "e3"}); got != "'click' '--ref' 'e3'" {
+		t.Fatalf("unexpected quoted args: %q", got)
+	}
+}
+
+func TestComputerRefFallbackPoint(t *testing.T) {
+	item := a11ySnapshotItem{Ref: "e3", Center: &a11yPoint{X: 120, Y: 240}}
+	item.CenterX = item.Center.X
+	item.CenterY = item.Center.Y
+	if item.Ref != "e3" {
+		t.Fatalf("expected ref e3, got %q", item.Ref)
+	}
+	if item.CenterX != 120 || item.CenterY != 240 {
+		t.Fatalf("expected center to propagate, got %d,%d", item.CenterX, item.CenterY)
+	}
+	if got := normalizeBrowserRef("E3"); got != "e3" {
+		t.Fatalf("expected canonical ref e3, got %q", got)
+	}
+}

@@ -24,6 +24,38 @@ func TestGenerateSystemPromptIncludesPlatformIdentitiesInChat(t *testing.T) {
 	}
 }
 
+func TestGenerateSystemPromptIncludesDisplayToolsWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	prompt := GenerateSystemPrompt(SystemPromptParams{
+		SessionType:    "chat",
+		Now:            time.Unix(1, 0).UTC(),
+		Timezone:       "UTC",
+		DisplayEnabled: true,
+	})
+
+	if !strings.Contains(prompt, "## Workspace browser & desktop") {
+		t.Fatalf("expected display tools section in prompt")
+	}
+	if !strings.Contains(prompt, "browser_observe") {
+		t.Fatalf("expected browser tool mention in prompt")
+	}
+}
+
+func TestGenerateSystemPromptOmitsDisplayToolsWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	prompt := GenerateSystemPrompt(SystemPromptParams{
+		SessionType: "chat",
+		Now:         time.Unix(1, 0).UTC(),
+		Timezone:    "UTC",
+	})
+
+	if strings.Contains(prompt, "## Workspace browser & desktop") {
+		t.Fatalf("expected display tools section to be omitted")
+	}
+}
+
 func TestGenerateSystemPromptIncludesPlatformIdentitiesInDiscuss(t *testing.T) {
 	t.Parallel()
 
