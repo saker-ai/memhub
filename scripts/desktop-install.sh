@@ -9,8 +9,8 @@ install_debian() {
   if ! has_cmd apt-extracttemplates; then
     apt-get install -y --no-install-recommends apt-utils
   fi
-  progress 42 installing "Installing VNC, desktop, and CJK fonts"
-  apt-get install -y --no-install-recommends ca-certificates curl gnupg dbus-x11 x11-xserver-utils xterm xfce4 tigervnc-standalone-server fontconfig fonts-dejavu fonts-noto-cjk fonts-noto-color-emoji procps
+  progress 42 installing "Installing VNC, desktop, accessibility, and CJK fonts"
+  apt-get install -y --no-install-recommends ca-certificates curl gnupg dbus-x11 x11-xserver-utils xterm xfce4 tigervnc-standalone-server fontconfig fonts-dejavu fonts-noto-cjk fonts-noto-color-emoji procps at-spi2-core
   if ! find_browser >/dev/null 2>&1; then
     progress 66 browser "Installing browser"
     if apt-get install -y --no-install-recommends chromium || apt-get install -y --no-install-recommends chromium-browser; then
@@ -30,6 +30,6 @@ install_debian() {
 install_alpine() {
   has_cmd apk || { echo "This image looks Alpine-like but apk is unavailable. Install the Memoh workspace toolkit or use a Debian/Alpine image." >&2; exit 1; }
   progress 18 system "Detected Alpine workspace"
-  progress 42 installing "Installing VNC, desktop, browser, and CJK fonts"
-  apk add --no-cache tigervnc xkeyboard-config xfce4 xfce4-terminal dbus-x11 xterm chromium fontconfig ttf-dejavu font-noto-cjk font-noto-emoji
+  progress 42 installing "Installing VNC, desktop, browser, accessibility, and CJK fonts"
+  apk add --no-cache tigervnc xkeyboard-config xfce4 xfce4-terminal dbus-x11 xterm chromium fontconfig ttf-dejavu font-noto-cjk font-noto-emoji at-spi2-core
 }

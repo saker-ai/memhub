@@ -345,6 +345,7 @@ func startDisplayBrowser(ctx context.Context) {
 		"--disable-gpu",
 		"--no-first-run",
 		"--no-default-browser-check",
+		"--force-renderer-accessibility",
 		"--remote-debugging-address=127.0.0.1",
 		"--remote-debugging-port="+displayBrowserCDPPort,
 		"--remote-allow-origins=*",
@@ -546,19 +547,26 @@ func resolveDisplayCommand(candidates ...string) string {
 }
 
 func withDisplayEnv(env []string) []string {
-	out := make([]string, 0, len(env)+1)
+	out := make([]string, 0, len(env)+2)
 	hasDisplay := false
+	hasGtkA11y := false
 	for _, item := range env {
 		switch {
 		case strings.HasPrefix(item, "DISPLAY="):
 			out = append(out, "DISPLAY="+xvncDisplay)
 			hasDisplay = true
+		case strings.HasPrefix(item, "GTK_A11Y="):
+			out = append(out, item)
+			hasGtkA11y = true
 		default:
 			out = append(out, item)
 		}
 	}
 	if !hasDisplay {
 		out = append(out, "DISPLAY="+xvncDisplay)
+	}
+	if !hasGtkA11y {
+		out = append(out, "GTK_A11Y=1")
 	}
 	return out
 }

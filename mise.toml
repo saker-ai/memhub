@@ -14,6 +14,9 @@ pnpm = "10"
 sqlc = "1.31.1"
 # golangci-lint for Go linting
 "golangci-lint" = "2.10.1"
+# Rust toolchain for the a11y-cli helper used by Computer Use.
+# Pinned to a stable >= zbus MSRV (1.87+).
+rust = "1.90"
 
 [task_config]
 dir = "{{cwd}}"
@@ -225,8 +228,58 @@ run = "go build -o bin/memoh ./cmd/memoh"
 description = "Install socktainer"
 run = "brew tap socktainer/tap && brew install socktainer"
 
+[tasks."a11y-cli:build"]
+description = "Build the a11y-cli AT-SPI helper for the workspace runtime (Linux musl static)"
+run = """
+#!/bin/bash
+# Builds crates/a11y-cli into a static musl Linux ELF so it runs on any
+# workspace container regardless of glibc version (Debian Bookworm, Alpine,
+# etc). Building against a newer glibc would fail at runtime with
+# `version 'GLIBC_2.XX' not found`.
+set -euo pipefail
+
+case "$(uname -m)" in
+  x86_64) HOST_ARCH=amd64; PLATFORM=linux/amd64; MUSL_TARGET=x86_64-unknown-linux-musl ;;
+  aarch64|arm64) HOST_ARCH=arm64; PLATFORM=linux/arm64; MUSL_TARGET=aarch64-unknown-linux-musl ;;
+  *) echo "ERROR: unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+
+if [ "$(uname -s)" = "Linux" ]; then
+  rustup target add "$MUSL_TARGET" >/dev/null 2>&1 || true
+  cargo build --release --target "$MUSL_TARGET" -p a11y-cli
+  echo "a11y-cli built at target/$MUSL_TARGET/release/a11y-cli (host)"
+  exit 0
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: building a11y-cli on non-Linux hosts requires Docker." >&2
+  exit 1
+fi
+
+CARGO_HOME_HOST="${CARGO_HOME:-$HOME/.cargo}"
+mkdir -p "$CARGO_HOME_HOST/registry" "$CARGO_HOME_HOST/git" target/linux
+
+echo "Cross-building a11y-cli for $PLATFORM via rust:1.90-alpine (musl static)..."
+docker run --rm \\
+  --platform "$PLATFORM" \\
+  -v "$(pwd):/work" \\
+  -v "$CARGO_HOME_HOST/registry:/usr/local/cargo/registry" \\
+  -v "$CARGO_HOME_HOST/git:/usr/local/cargo/git" \\
+  -w /work \\
+  -e CARGO_TARGET_DIR=/work/target/linux \\
+  rust:1.90-alpine \\
+  sh -eu -c 'apk add --no-cache musl-dev && cargo build --release -p a11y-cli'
+
+echo "a11y-cli built at target/linux/release/a11y-cli ($HOST_ARCH, musl static)"
+"""
+
+[tasks."a11y-cli:check"]
+description = "Type-check the a11y-cli crate"
+run = "cargo check -p a11y-cli"
+
 [tasks.install-workspace-toolkit]
 description = "Install workspace toolkit"
+depends = ["//:a11y-cli:build"]
 run = "./docker/toolkit/install.sh .toolkit"
 
 [tasks."docker:vnc:build"]

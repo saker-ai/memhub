@@ -113,26 +113,36 @@ func (p *BrowserProvider) Tools(ctx context.Context, session SessionContext) ([]
 		},
 		{
 			Name:        "browser_observe",
-			Description: "Inspect the current workspace browser without changing page state. Prefer snapshot for interactive elements and get_content for readable text. Use screenshot_annotate only when visual layout matters or you need rendered-page refs. Use evaluate only for small DOM queries or page-state checks.",
+			Description: "Inspect the current workspace browser without changing page state. Prefer snapshot for interactive elements and get_content for readable text. Use screenshot_annotate only when visual layout matters or you need rendered-page refs. Use evaluate only for small DOM queries or page-state checks. Screenshots are saved to a workspace path; read that path with the file read tool when you need the visual.",
 			Parameters: browserObjectSchema(map[string]any{
 				"observe":   map[string]any{"type": "string", "enum": []string{"snapshot", "get_content", "screenshot_annotate", "screenshot", "get_html", "evaluate", "get_url", "get_title", "pdf", "tab_list"}, "description": "What to observe from the page."},
 				"ref":       map[string]any{"type": "string", "description": "Element ref from snapshot or screenshot_annotate. Scopes get_content/get_html and evaluate helper use."},
 				"selector":  map[string]any{"type": "string", "description": "CSS selector to scope get_content or get_html when no ref is available."},
 				"script":    map[string]any{"type": "string", "description": "JavaScript expression to evaluate. Keep it short and read-only unless the task requires otherwise."},
 				"full_page": map[string]any{"type": "boolean", "default": false, "description": "Capture a full-page screenshot for screenshot."},
-				"share":     map[string]any{"type": "boolean", "default": false, "description": "Also send screenshot output to the current conversation. Default false for internal observation."},
 			}, []string{"observe"}),
 			Execute: func(ctx *sdk.ToolExecContext, input any) (any, error) {
 				return p.execBrowserObserve(ctx.Context, sess, inputAsMap(input))
 			},
 		},
 		{
-			Name:        "computer_use",
-			Description: "Raw desktop fallback for UI that cannot be reached through browser refs or selectors, such as native dialogs, non-browser apps, or broken CDP state. Start with action=screenshot, then perform small coordinate-based actions. Prefer browser tools whenever the target is inside the web page.",
+			Name:        "computer_observe",
+			Description: "Inspect the workspace desktop without changing state. Use snapshot for an accessibility-tree listing of interactive UI elements (returns refs like e3 you can pass to computer_action). Use screenshot only when accessibility is unavailable or you need visual layout; the image is saved to a workspace path and must be read explicitly with the file read tool.",
 			Parameters: browserObjectSchema(map[string]any{
-				"action":      map[string]any{"type": "string", "enum": []string{"screenshot", "mouse_move", "pointer", "click", "double_click", "drag", "scroll", "key", "type", "wait"}, "description": "Desktop action to perform."},
-				"x":           map[string]any{"type": "integer", "minimum": 0, "description": "X coordinate in desktop pixels."},
-				"y":           map[string]any{"type": "integer", "minimum": 0, "description": "Y coordinate in desktop pixels."},
+				"observe": map[string]any{"type": "string", "enum": []string{"snapshot", "screenshot"}, "description": "What to observe from the desktop."},
+			}, []string{"observe"}),
+			Execute: func(ctx *sdk.ToolExecContext, input any) (any, error) {
+				return p.execComputerObserve(ctx.Context, sess, inputAsMap(input))
+			},
+		},
+		{
+			Name:        "computer_action",
+			Description: "Drive the workspace desktop. Prefer ref from computer_observe snapshot for click/double_click/type/fill/scroll; coordinates (x, y) are only a fallback when no ref applies (native dialogs, raw drags, pointer hovers). Use browser_action for in-page targets whenever possible.",
+			Parameters: browserObjectSchema(map[string]any{
+				"action":      map[string]any{"type": "string", "enum": []string{"click", "double_click", "type", "fill", "key", "scroll", "drag", "wait", "mouse_move", "pointer"}, "description": "Desktop action to perform."},
+				"ref":         map[string]any{"type": "string", "description": "Element ref such as e3 from computer_observe snapshot. Preferred over coordinates for click/double_click/type/fill/scroll."},
+				"x":           map[string]any{"type": "integer", "minimum": 0, "description": "X coordinate in desktop pixels (used when no ref is provided or as fallback)."},
+				"y":           map[string]any{"type": "integer", "minimum": 0, "description": "Y coordinate in desktop pixels (used when no ref is provided or as fallback)."},
 				"to_x":        map[string]any{"type": "integer", "minimum": 0, "description": "Destination X coordinate for drag."},
 				"to_y":        map[string]any{"type": "integer", "minimum": 0, "description": "Destination Y coordinate for drag."},
 				"button":      map[string]any{"type": "string", "enum": []string{"left", "middle", "right"}, "description": "Mouse button. Defaults to left."},
@@ -140,11 +150,10 @@ func (p *BrowserProvider) Tools(ctx context.Context, session SessionContext) ([]
 				"direction":   map[string]any{"type": "string", "enum": []string{"up", "down", "left", "right"}, "description": "Scroll direction. Defaults to down."},
 				"amount":      map[string]any{"type": "integer", "minimum": 1, "maximum": 10000, "default": 500, "description": "Scroll amount or wait duration in milliseconds."},
 				"key":         map[string]any{"type": "string", "description": "Key or key chord, e.g. Enter, Escape, Control+a."},
-				"text":        map[string]any{"type": "string", "description": "Text to type."},
-				"share":       map[string]any{"type": "boolean", "default": false, "description": "Also send screenshots to the current conversation. Default false for internal observation."},
+				"text":        map[string]any{"type": "string", "description": "Text to type or fill into the target."},
 			}, []string{"action"}),
 			Execute: func(ctx *sdk.ToolExecContext, input any) (any, error) {
-				return p.execComputerUse(ctx.Context, sess, inputAsMap(input))
+				return p.execComputerAction(ctx.Context, sess, inputAsMap(input))
 			},
 		},
 		{
@@ -200,7 +209,7 @@ func (p *BrowserProvider) execBrowserAction(ctx context.Context, session Session
 	if err != nil {
 		return nil, err
 	}
-	return p.browserActionResult(ctx, botID, session, data), nil
+	return p.browserActionResult(ctx, botID, data), nil
 }
 
 func (p *BrowserProvider) execBrowserObserve(ctx context.Context, session SessionContext, args map[string]any) (any, error) {
@@ -216,9 +225,6 @@ func (p *BrowserProvider) execBrowserObserve(ctx context.Context, session Sessio
 	}
 	if v, ok, _ := BoolArg(args, "full_page"); ok {
 		payload["full_page"] = v
-	}
-	if v, ok, _ := BoolArg(args, "share"); ok {
-		payload["share"] = v
 	}
 	return p.execBrowserAction(ctx, session, payload)
 }
@@ -275,18 +281,22 @@ func (p *BrowserProvider) execRemoteSession(ctx context.Context, session Session
 	}
 }
 
-func (p *BrowserProvider) execComputerUse(ctx context.Context, session SessionContext, args map[string]any) (any, error) {
-	action := StringArg(args, "action")
-	if action == "" {
-		return nil, errors.New("action is required")
+func (p *BrowserProvider) execComputerObserve(ctx context.Context, session SessionContext, args map[string]any) (any, error) {
+	observe := strings.TrimSpace(StringArg(args, "observe"))
+	if observe == "" {
+		return nil, errors.New("observe is required")
 	}
-	if action == "screenshot" {
-		return p.execComputerScreenshot(ctx, session, args)
+	switch observe {
+	case "screenshot":
+		return p.execComputerScreenshot(ctx, session)
+	case "snapshot":
+		return p.execComputerSnapshot(ctx, session)
+	default:
+		return nil, fmt.Errorf("unknown computer observe: %s", observe)
 	}
-	return p.execComputerControl(ctx, session, args)
 }
 
-func (p *BrowserProvider) execComputerScreenshot(ctx context.Context, session SessionContext, args map[string]any) (any, error) {
+func (p *BrowserProvider) execComputerScreenshot(ctx context.Context, session SessionContext) (any, error) {
 	botID, err := p.requireComputerDisplay(session)
 	if err != nil {
 		return nil, err
@@ -295,15 +305,38 @@ func (p *BrowserProvider) execComputerScreenshot(ctx context.Context, session Se
 	if err != nil {
 		return nil, err
 	}
-	return p.buildScreenshotBytesResult(ctx, botID, img, mime, session, p.screenshotDir(computerScreenshotSubdir), map[string]any{"share": shareArg(args)}), nil
+	return p.buildScreenshotBytesResult(ctx, botID, img, mime, p.screenshotDir(computerScreenshotSubdir), nil), nil
 }
 
-func (p *BrowserProvider) execComputerControl(ctx context.Context, session SessionContext, args map[string]any) (any, error) {
+func (p *BrowserProvider) execComputerSnapshot(ctx context.Context, session SessionContext) (any, error) {
+	botID, err := p.requireComputerDisplay(session)
+	if err != nil {
+		return nil, err
+	}
+	client, err := p.containers.MCPClient(ctx, botID)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := computerA11ySnapshot(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"snapshot":  snapshot.Lines,
+		"ref_count": len(snapshot.Items),
+	}, nil
+}
+
+func (p *BrowserProvider) execComputerAction(ctx context.Context, session SessionContext, args map[string]any) (any, error) {
 	botID, err := p.requireComputerDisplay(session)
 	if err != nil {
 		return nil, err
 	}
 	action := StringArg(args, "action")
+	if action == "" {
+		return nil, errors.New("action is required")
+	}
+	ref := normalizeBrowserRef(StringArg(args, "ref"))
 	switch action {
 	case "mouse_move", "pointer":
 		x, y, err := requiredPoint(args)
@@ -321,21 +354,52 @@ func (p *BrowserProvider) execComputerControl(ctx context.Context, session Sessi
 		}
 		return map[string]any{"moved": true, "x": x, "y": y, "button_mask": mask}, nil
 	case "click", "double_click":
-		x, y, err := requiredPoint(args)
-		if err != nil {
-			return nil, err
-		}
-		mask := mouseButtonMask(StringArg(args, "button"))
 		count := 1
 		if action == "double_click" {
 			count = 2
 		}
+		if ref != "" {
+			result, err := p.clickByRef(ctx, botID, ref, count)
+			if err != nil {
+				return nil, err
+			}
+			if result != nil {
+				return result, nil
+			}
+		}
+		x, y, err := requiredPoint(args)
+		if err != nil {
+			return nil, fmt.Errorf("click requires ref or x/y: %w", err)
+		}
+		mask := mouseButtonMask(StringArg(args, "button"))
 		for i := 0; i < count; i++ {
 			if err := p.pointerClick(ctx, botID, x, y, mask); err != nil {
 				return nil, err
 			}
 		}
 		return map[string]any{"clicked": true, "x": x, "y": y, "button": buttonName(mask), "click_count": count}, nil
+	case "type", "fill":
+		text := StringArg(args, "text")
+		if text == "" {
+			return nil, errors.New("text is required")
+		}
+		if ref != "" {
+			result, err := p.editByRef(ctx, botID, ref, text, action == "fill")
+			if err != nil {
+				return nil, err
+			}
+			if result != nil {
+				return result, nil
+			}
+		}
+		if err := p.typeText(ctx, botID, text); err != nil {
+			return nil, err
+		}
+		out := map[string]any{"typed": text}
+		if action == "fill" {
+			out = map[string]any{"filled": text}
+		}
+		return out, nil
 	case "drag":
 		x, y, err := requiredPoint(args)
 		if err != nil {
@@ -351,6 +415,11 @@ func (p *BrowserProvider) execComputerControl(ctx context.Context, session Sessi
 		return map[string]any{"dragged": true, "x": x, "y": y, "to_x": toX, "to_y": toY}, nil
 	case "scroll":
 		x, y := optionalPoint(args, defaultComputerWidth/2, defaultComputerHeight/2)
+		if ref != "" {
+			if entry, err := lookupComputerRef(ctx, p.containers, botID, ref); err == nil && entry != nil {
+				x, y = entry.CenterX, entry.CenterY
+			}
+		}
 		direction := StringArg(args, "direction")
 		if direction == "" {
 			direction = "down"
@@ -372,15 +441,6 @@ func (p *BrowserProvider) execComputerControl(ctx context.Context, session Sessi
 			return nil, err
 		}
 		return map[string]any{"pressed": key}, nil
-	case "type":
-		text := StringArg(args, "text")
-		if text == "" {
-			return nil, errors.New("text is required")
-		}
-		if err := p.typeText(ctx, botID, text); err != nil {
-			return nil, err
-		}
-		return map[string]any{"typed": text}, nil
 	case "wait":
 		amount, err := intArgOr(args, "amount", 1000)
 		if err != nil {
@@ -391,7 +451,75 @@ func (p *BrowserProvider) execComputerControl(ctx context.Context, session Sessi
 		}
 		return map[string]any{"waited_ms": amount}, nil
 	default:
-		return nil, fmt.Errorf("unknown computer control action: %s", action)
+		return nil, fmt.Errorf("unknown computer action: %s", action)
+	}
+}
+
+func (p *BrowserProvider) clickByRef(ctx context.Context, botID, ref string, count int) (map[string]any, error) {
+	client, err := p.containers.MCPClient(ctx, botID)
+	if err != nil {
+		return nil, err
+	}
+	result, err := computerA11yClick(ctx, client, ref)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case result.OK:
+		out := map[string]any{"clicked": true, "ref": ref, "click_count": count, "via": "a11y"}
+		if count == 2 {
+			out["double_clicked"] = true
+		}
+		return out, nil
+	case result.Fallback != nil:
+		mask := rfbButtonLeft
+		for i := 0; i < count; i++ {
+			if err := p.pointerClick(ctx, botID, result.Fallback.X, result.Fallback.Y, mask); err != nil {
+				return nil, err
+			}
+		}
+		return map[string]any{"clicked": true, "x": result.Fallback.X, "y": result.Fallback.Y, "ref": ref, "click_count": count, "via": "rfb_fallback"}, nil
+	default:
+		if result.Error != "" {
+			return nil, fmt.Errorf("a11y click %s failed: %s", ref, result.Error)
+		}
+		return nil, fmt.Errorf("a11y click %s failed without diagnostic", ref)
+	}
+}
+
+func (p *BrowserProvider) editByRef(ctx context.Context, botID, ref, text string, replace bool) (map[string]any, error) {
+	client, err := p.containers.MCPClient(ctx, botID)
+	if err != nil {
+		return nil, err
+	}
+	result, err := computerA11yEdit(ctx, client, ref, text, replace)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case result.OK:
+		key := "typed"
+		if replace {
+			key = "filled"
+		}
+		return map[string]any{key: text, "ref": ref, "via": "a11y"}, nil
+	case result.Fallback != nil:
+		if err := p.pointerClick(ctx, botID, result.Fallback.X, result.Fallback.Y, rfbButtonLeft); err != nil {
+			return nil, err
+		}
+		if err := p.typeText(ctx, botID, text); err != nil {
+			return nil, err
+		}
+		key := "typed"
+		if replace {
+			key = "filled"
+		}
+		return map[string]any{key: text, "ref": ref, "x": result.Fallback.X, "y": result.Fallback.Y, "via": "rfb_fallback"}, nil
+	default:
+		if result.Error != "" {
+			return nil, fmt.Errorf("a11y edit %s failed: %s", ref, result.Error)
+		}
+		return nil, fmt.Errorf("a11y edit %s failed without diagnostic", ref)
 	}
 }
 
@@ -938,7 +1066,7 @@ return true;
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"screenshot": b64, "mimeType": "image/png", "share": shareArg(args)}, nil
+		return map[string]any{"screenshot": b64, "mimeType": "image/png"}, nil
 	case "screenshot_annotate":
 		annotations, err := page.annotate(ctx)
 		if err != nil {
@@ -952,7 +1080,7 @@ return true;
 		if removeErr != nil {
 			p.logger.Debug("remove browser annotations failed", slog.Any("error", removeErr))
 		}
-		return map[string]any{"screenshot": b64, "mimeType": "image/png", "annotations": annotations, "share": shareArg(args)}, nil
+		return map[string]any{"screenshot": b64, "mimeType": "image/png", "annotations": annotations}, nil
 	case "snapshot":
 		snapshot, err := page.accessibilitySnapshot(ctx)
 		if err != nil {
@@ -1191,9 +1319,9 @@ func (p *BrowserProvider) runCDPTabAction(ctx context.Context, client *bridge.Cl
 	}
 }
 
-func (p *BrowserProvider) browserActionResult(ctx context.Context, botID string, session SessionContext, data map[string]any) any {
+func (p *BrowserProvider) browserActionResult(ctx context.Context, botID string, data map[string]any) any {
 	if b64, ok := data["screenshot"].(string); ok && b64 != "" {
-		return p.buildScreenshotResult(ctx, botID, b64, session, p.screenshotDir(browserScreenshotSubdir), data)
+		return p.buildScreenshotResult(ctx, botID, b64, p.screenshotDir(browserScreenshotSubdir), data)
 	}
 	return data
 }
@@ -1708,36 +1836,24 @@ func (p *cdpPage) navigateHistory(ctx context.Context, forward bool) error {
 	return err
 }
 
-func (p *BrowserProvider) buildScreenshotResult(ctx context.Context, botID, base64Data string, session SessionContext, dir string, data map[string]any) any {
+func (p *BrowserProvider) buildScreenshotResult(ctx context.Context, botID, base64Data string, dir string, data map[string]any) any {
 	imgBytes, err := base64.StdEncoding.DecodeString(base64Data)
 	if err != nil {
 		return map[string]any{"content": []map[string]any{{"type": "text", "text": "Screenshot captured (failed to decode image data)"}}}
 	}
-	return p.buildScreenshotBytesResult(ctx, botID, imgBytes, "image/png", session, dir, data)
+	return p.buildScreenshotBytesResult(ctx, botID, imgBytes, "image/png", dir, data)
 }
 
-func (p *BrowserProvider) buildScreenshotBytesResult(ctx context.Context, botID string, imgBytes []byte, mimeType string, session SessionContext, dir string, data map[string]any) any {
+func (p *BrowserProvider) buildScreenshotBytesResult(ctx context.Context, botID string, imgBytes []byte, mimeType string, dir string, data map[string]any) any {
 	if mimeType == "" {
 		mimeType = "image/png"
 	}
-	encoded := base64.StdEncoding.EncodeToString(imgBytes)
-	share := mapBool(data, "share")
-	if share {
-		p.emitScreenshotAttachment(session, encoded, int64(len(imgBytes)), mimeType)
-	}
-
 	ext := screenshotExtension(mimeType)
 	containerPath := fmt.Sprintf("%s/%d%s", dir, time.Now().UnixMilli(), ext)
 	saveErr := p.saveBytes(ctx, botID, containerPath, imgBytes)
 	text := fmt.Sprintf("Screenshot saved to %s", containerPath)
-	if share {
-		text += " and sent to user"
-	}
 	if saveErr != nil {
 		text = fmt.Sprintf("Screenshot captured (failed to save: %s)", saveErr.Error())
-		if share {
-			text = fmt.Sprintf("Screenshot captured and sent to user (failed to save: %s)", saveErr.Error())
-		}
 	}
 	content := []map[string]any{{"type": "text", "text": text}}
 	if data != nil {
@@ -1745,7 +1861,7 @@ func (p *BrowserProvider) buildScreenshotBytesResult(ctx context.Context, botID 
 			content = append(content, map[string]any{"type": "text", "text": fmt.Sprintf("Annotations: %v", annotations)})
 		}
 	}
-	result := map[string]any{"content": content, "path": containerPath, "mimeType": mimeType, "shared": share}
+	result := map[string]any{"content": content, "path": containerPath, "mimeType": mimeType}
 	if saveErr != nil {
 		result["save_error"] = saveErr.Error()
 	}
@@ -1773,24 +1889,6 @@ func (p *BrowserProvider) saveBytes(ctx context.Context, botID, path string, dat
 		return err
 	}
 	return client.WriteFile(ctx, path, data)
-}
-
-func (*BrowserProvider) emitScreenshotAttachment(session SessionContext, base64Data string, size int64, mimeType string) {
-	if session.Emitter == nil {
-		return
-	}
-	ext := screenshotExtension(mimeType)
-	session.Emitter(ToolStreamEvent{
-		Type: StreamEventAttachment,
-		Attachments: []Attachment{{
-			Type:   "image",
-			URL:    "data:" + mimeType + ";base64," + base64Data,
-			Mime:   mimeType,
-			Size:   size,
-			Name:   "screenshot" + ext,
-			Base64: base64Data,
-		}},
-	})
 }
 
 func screenshotExtension(mimeType string) string {
@@ -2111,20 +2209,6 @@ func normalizeBrowserAction(action string) string {
 	default:
 		return normalized
 	}
-}
-
-func shareArg(args map[string]any) bool {
-	share, _, _ := BoolArg(args, "share")
-	return share
-}
-
-func mapBool(values map[string]any, key string) bool {
-	value, ok := values[key]
-	if !ok {
-		return false
-	}
-	typed, ok := value.(bool)
-	return ok && typed
 }
 
 func timeoutArg(args map[string]any, fallback int) int {

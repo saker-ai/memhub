@@ -162,6 +162,8 @@ Memoh/
 │   ├── sdk/                    #   TypeScript SDK (@memohai/sdk, auto-generated from OpenAPI)
 │   ├── icons/                  #   Brand/provider icon library (@memohai/icon)
 │   └── config/                 #   Shared configuration utilities (@memohai/config)
+├── crates/                     # Rust crates packaged into the workspace toolkit
+│   └── a11y-cli/               #   AT-SPI accessibility helper used by Computer Use
 ├── spec/                       # OpenAPI specifications (swagger.json, swagger.yaml)
 ├── db/                         # Database
 │   ├── postgres/               #   PostgreSQL SQL resources
@@ -233,6 +235,8 @@ Memoh/
 | `mise run build-embedded-assets` | Build and stage embedded web assets |
 | `mise run build-unified` | Build memoh CLI locally |
 | `mise run bridge:build` | Rebuild bridge binary in dev container |
+| `mise run a11y-cli:build` | Build the Rust AT-SPI helper used by Computer Use (Linux output) |
+| `mise run a11y-cli:check` | Run `cargo check` for the a11y-cli crate |
 | `mise run desktop:dev` | Start Electron desktop app in dev mode (renderer reuses @memohai/web) |
 | `mise run desktop:build` | Build Electron desktop app for release (electron-builder) |
 | `mise run lint` | Run all linters (Go + ESLint) |
@@ -298,7 +302,7 @@ PostgreSQL migrations live in `db/postgres/migrations/` and follow a dual-update
 - Prompt templates are embedded Go Markdown files in `internal/agent/prompts/`. Partials (reusable fragments) are prefixed with `_` (e.g., `_tools.md`, `_memory.md`). System prompts include `system_chat.md` (standard chat) and `system_discuss.md` (discuss mode).
 - The conversation flow resolver (`internal/conversation/flow/`) orchestrates message assembly, memory injection, history trimming, and agent invocation.
 - The discuss/chat pipeline (`internal/pipeline/`) provides an alternative orchestration path with adaptation, projection, rendering, and driver layers.
-- Browser Use and Computer Use capabilities live in `internal/agent/tools/browser.go` and are exposed only when the bot's workspace display is enabled. `browser_action` / `browser_observe` operate the headed workspace Chrome/Chromium instance over CDP, `browser_remote_session` exposes the same CDP endpoint for code-driven Playwright/CDP sessions, and `computer_use` drives the broader GUI desktop through screenshots plus RFB-style pointer/keyboard input. Prefer Browser Use for web pages; use Computer Use for native dialogs, non-browser apps, or GUI states that CDP cannot reach.
+- Browser Use and Computer Use capabilities live in `internal/agent/tools/browser.go` (plus `internal/agent/tools/computer_a11y.go`) and are exposed only when the bot's workspace display is enabled. `browser_action` / `browser_observe` operate the headed workspace Chrome/Chromium instance over CDP, `browser_remote_session` exposes the same CDP endpoint for code-driven Playwright/CDP sessions, and the Computer Use pair (`computer_observe` / `computer_action`) drives the broader GUI desktop: snapshots come from the AT-SPI accessibility tree via the bundled `a11y-cli` Rust helper at `/opt/memoh/toolkit/display/bin/a11y-cli`, and raw RFB pointer/keyboard input remains as a fallback when accessibility cannot reach the target. Both browser and computer screenshots are saved to a workspace path and never auto-attached to the conversation, so the model must explicitly read the path when it wants the image. Prefer Browser Use for web pages; use Computer Use for native dialogs, non-browser apps, or GUI states that CDP cannot reach.
 - Headless Playwright scripts are still ordinary workspace commands, but they are not the same path as the headed workspace browser/display stack. Use the headed Browser Use tools when the user needs to inspect or operate the visible workspace browser.
 - The compaction service (`internal/compaction/`) handles LLM-based conversation summarization.
 - Loop detection (text and tool loops) is built into the agent with configurable thresholds.
