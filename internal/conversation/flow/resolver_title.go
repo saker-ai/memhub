@@ -23,10 +23,14 @@ const (
 	titleGenerateTimeout     = 60 * time.Second
 )
 
-// SessionService is the interface the resolver uses for session title updates.
+// SessionService is the interface the resolver uses for session title
+// updates and (for the team-handoff flow) for looking up / creating
+// stable per-issue sessions.
 type SessionService interface {
 	Get(ctx context.Context, sessionID string) (session.Session, error)
 	UpdateTitle(ctx context.Context, sessionID, title string) (session.Session, error)
+	ListByBot(ctx context.Context, botID string) ([]session.Session, error)
+	Create(ctx context.Context, input session.CreateInput) (session.Session, error)
 }
 
 // SetSessionService configures the session service used for auto title generation.
@@ -132,7 +136,8 @@ func (r *Resolver) generateTitle(ctx context.Context, userID string, model model
 	)
 
 	client := sdk.NewClient()
-	text, err := client.GenerateText(genCtx,
+	text, err := client.GenerateText(
+		genCtx,
 		sdk.WithModel(sdkModel),
 		sdk.WithSystem(system),
 		sdk.WithMessages(messages),

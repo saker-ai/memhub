@@ -1411,6 +1411,15 @@ definitions:
       updated_at:
         type: string
     type: object
+  handlers.AssignIssueRequest:
+    properties:
+      assignee_bot_id:
+        type: string
+      assignee_type:
+        type: string
+      assignee_user_id:
+        type: string
+    type: object
   handlers.BatchDeleteRequest:
     properties:
       ids:
@@ -1443,6 +1452,33 @@ definitions:
         type: string
       user_config_schema:
         $ref: '#/definitions/channel.ConfigSchema'
+    type: object
+  handlers.CommentResponse:
+    properties:
+      author_bot_id:
+        type: string
+      author_type:
+        type: string
+      author_user_id:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      issue_id:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      parent_comment_id:
+        type: string
+      team_id:
+        type: string
+      updated_at:
+        type: string
     type: object
   handlers.ContainerCPUMetricsResponse:
     properties:
@@ -1503,6 +1539,17 @@ definitions:
       used_tokens:
         type: integer
     type: object
+  handlers.CreateCommentRequest:
+    properties:
+      content:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      parent_comment_id:
+        type: string
+    type: object
   handlers.CreateContainerRequest:
     properties:
       gpu:
@@ -1541,6 +1588,44 @@ definitions:
       workspace_backend:
         type: string
     type: object
+  handlers.CreateIssueRequest:
+    properties:
+      assignee_bot_id:
+        type: string
+      assignee_type:
+        type: string
+      assignee_user_id:
+        type: string
+      description:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      parent_issue_id:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+    type: object
+  handlers.CreateMemberRequest:
+    properties:
+      bot_id:
+        type: string
+      instructions:
+        type: string
+      member_type:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      role:
+        type: string
+      user_id:
+        type: string
+    type: object
   handlers.CreateSnapshotRequest:
     properties:
       snapshot_name:
@@ -1562,6 +1647,21 @@ definitions:
         type: string
       version:
         type: integer
+    type: object
+  handlers.CreateTeamRequest:
+    properties:
+      description:
+        type: string
+      instructions:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      name:
+        type: string
+      shared_dir_name:
+        type: string
     type: object
   handlers.DailyTokenUsage:
     properties:
@@ -1712,6 +1812,47 @@ definitions:
       workspace_backend:
         type: string
     type: object
+  handlers.HandoffResponse:
+    properties:
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      failure_reason:
+        type: string
+      from_actor_type:
+        type: string
+      from_bot_id:
+        type: string
+      from_user_id:
+        type: string
+      id:
+        type: string
+      issue_id:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      result_comment_id:
+        type: string
+      return_handoff_id:
+        type: string
+      source_session_id:
+        type: string
+      status:
+        type: string
+      target_session_id:
+        type: string
+      team_id:
+        type: string
+      to_bot_id:
+        type: string
+      trigger_comment_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
   handlers.InstallMcpRequest:
     properties:
       env:
@@ -1724,6 +1865,45 @@ definitions:
   handlers.InstallSkillRequest:
     properties:
       skill_id:
+        type: string
+    type: object
+  handlers.IssueResponse:
+    properties:
+      assignee_bot_id:
+        type: string
+      assignee_type:
+        type: string
+      assignee_user_id:
+        type: string
+      closed_at:
+        type: string
+      created_at:
+        type: string
+      created_by_bot_id:
+        type: string
+      created_by_type:
+        type: string
+      created_by_user_id:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      number:
+        type: integer
+      parent_issue_id:
+        type: string
+      status:
+        type: string
+      team_id:
+        type: string
+      title:
+        type: string
+      updated_at:
         type: string
     type: object
   handlers.ListSnapshotsResponse:
@@ -1796,6 +1976,33 @@ definitions:
           type: string
         type: array
       url:
+        type: string
+    type: object
+  handlers.MemberResponse:
+    properties:
+      bot_id:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      id:
+        type: string
+      instructions:
+        type: string
+      member_type:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      role:
+        type: string
+      team_id:
+        type: string
+      updated_at:
+        type: string
+      user_id:
         type: string
     type: object
   handlers.ModelTokenUsage:
@@ -2065,6 +2272,31 @@ definitions:
           type: string
         type: array
     type: object
+  handlers.TeamResponse:
+    properties:
+      archived_at:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      instructions:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      name:
+        type: string
+      owner_user_id:
+        type: string
+      shared_dir_name:
+        type: string
+      updated_at:
+        type: string
+    type: object
   handlers.TokenUsageRecord:
     properties:
       cache_read_tokens:
@@ -2134,6 +2366,51 @@ definitions:
       summary:
         type: string
     type: object
+  handlers.UpdateIssueRequest:
+    properties:
+      assignee_bot_id:
+        type: string
+      assignee_type:
+        type: string
+      assignee_user_id:
+        type: string
+      description:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      status:
+        type: string
+      title:
+        type: string
+    type: object
+  handlers.UpdateMemberRequest:
+    properties:
+      instructions:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      role:
+        type: string
+    type: object
+  handlers.UpdateTeamRequest:
+    properties:
+      description:
+        type: string
+      instructions:
+        type: string
+      metadata:
+        items:
+          type: integer
+        type: array
+      name:
+        type: string
+      shared_dir_name:
+        type: string
+    type: object
   handlers.createSessionRequest:
     properties:
       channel_type:
@@ -2146,6 +2423,8 @@ definitions:
     type: object
   handlers.displayInfoResponse:
     properties:
+      a11y_available:
+        type: boolean
       available:
         type: boolean
       browser_available:
@@ -7594,6 +7873,20 @@ paths:
       summary: OAuth2 callback for email providers
       tags:
       - email-oauth
+  /issues:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.IssueResponse'
+            type: array
+      summary: List all issues across teams for the current user
+      tags:
+      - issues
   /memory-providers:
     get:
       description: List configured memory providers
@@ -9069,6 +9362,429 @@ paths:
       summary: List all tags from supermarket
       tags:
       - supermarket
+  /teams:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.TeamResponse'
+            type: array
+      summary: List teams for the current user
+      tags:
+      - teams
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Team payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.TeamResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Create a team
+      tags:
+      - teams
+  /teams/{team_id}:
+    delete:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Archive a team
+      tags:
+      - teams
+    get:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TeamResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get a team
+      tags:
+      - teams
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Update payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TeamResponse'
+      summary: Update a team
+      tags:
+      - teams
+  /teams/{team_id}/issues:
+    get:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Only return open issues when set to 'open'
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.IssueResponse'
+            type: array
+      summary: List team issues
+      tags:
+      - issues
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Issue payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateIssueRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.IssueResponse'
+      summary: Create an issue
+      tags:
+      - issues
+  /teams/{team_id}/issues/{issue_id}:
+    delete:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Issue ID
+        in: path
+        name: issue_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete an issue
+      tags:
+      - issues
+    get:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Issue ID
+        in: path
+        name: issue_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.IssueResponse'
+      summary: Get an issue
+      tags:
+      - issues
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Issue ID
+        in: path
+        name: issue_id
+        required: true
+        type: string
+      - description: Issue payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateIssueRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.IssueResponse'
+      summary: Update an issue
+      tags:
+      - issues
+  /teams/{team_id}/issues/{issue_id}/assign:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Issue ID
+        in: path
+        name: issue_id
+        required: true
+        type: string
+      - description: Assignment
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AssignIssueRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.IssueResponse'
+      summary: Assign an issue
+      tags:
+      - issues
+  /teams/{team_id}/issues/{issue_id}/comments:
+    get:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Issue ID
+        in: path
+        name: issue_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.CommentResponse'
+            type: array
+      summary: List comments on an issue
+      tags:
+      - issues
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Issue ID
+        in: path
+        name: issue_id
+        required: true
+        type: string
+      - description: Comment payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CommentResponse'
+      summary: Post a comment on an issue
+      tags:
+      - issues
+  /teams/{team_id}/issues/{issue_id}/handoffs:
+    get:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Issue ID
+        in: path
+        name: issue_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.HandoffResponse'
+            type: array
+      summary: List handoffs on an issue
+      tags:
+      - issues
+  /teams/{team_id}/members:
+    get:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.MemberResponse'
+            type: array
+      summary: List team members
+      tags:
+      - teams
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Member payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.MemberResponse'
+      summary: Add a team member
+      tags:
+      - teams
+  /teams/{team_id}/members/{member_id}:
+    delete:
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: member_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Remove a team member
+      tags:
+      - teams
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Team ID
+        in: path
+        name: team_id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: member_id
+        required: true
+        type: string
+      - description: Member payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MemberResponse'
+      summary: Update a member
+      tags:
+      - teams
   /transcription-models:
     get:
       description: List all models of type 'transcription' (filtered view of unified

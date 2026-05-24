@@ -79,6 +79,33 @@
             </div>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarGroup
+          v-if="teams.length > 0"
+          class="px-2 py-0"
+        >
+          <SidebarGroupLabel class="text-[10px] uppercase text-muted-foreground tracking-wide">
+            {{ t('sidebar.teams') }}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu class="gap-1">
+              <SidebarMenuItem
+                v-for="team in teams"
+                :key="team.id"
+              >
+                <SidebarMenuButton
+                  :tooltip="team.name"
+                  :is-active="isTeamActive(team.id)"
+                  class="h-9 gap-2"
+                  @click="goToTeam(team.id)"
+                >
+                  <Users class="size-3.5" />
+                  <span class="text-xs font-medium truncate">{{ team.name }}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter class="relative border-0 px-2 pb-3.5 pt-2.5">
@@ -119,6 +146,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -126,7 +154,8 @@ import {
   SidebarRail,
   useSidebar,
 } from '@memohai/ui'
-import { Plus, LoaderCircle, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import { Plus, LoaderCircle, Settings, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-vue-next'
+import { getTeams } from '@memohai/sdk'
 import BotItem from './bot-item.vue'
 import { usePinnedBots } from '@/composables/usePinnedBots'
 import { DesktopShellKey } from '@/lib/desktop-shell'
@@ -146,5 +175,25 @@ const { sortBots } = usePinnedBots()
 const { data: botData, isLoading } = useQuery(getBotsQuery())
 const bots = computed<BotsBot[]>(() => sortBots(botData.value?.items ?? []))
 
+const { data: teamsData } = useQuery({
+  key: () => ['teams'],
+  query: async () => {
+    const { data, error } = await getTeams()
+    if (error) throw error
+    return data ?? []
+  },
+})
+const teams = computed(() => teamsData.value ?? [])
+
 const isSettingsActive = computed(() => route.path.startsWith('/settings'))
+
+function isTeamActive(teamId: string | undefined): boolean {
+  if (!teamId) return false
+  return route.path.startsWith(`/teams/${teamId}`)
+}
+
+function goToTeam(teamId: string | undefined) {
+  if (!teamId) return
+  router.push({ name: 'team-workspace', params: { teamId } })
+}
 </script>

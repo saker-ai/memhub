@@ -24,6 +24,13 @@ type SessionContext struct {
 	TimezoneLocation  *time.Location
 	SessionToken      string //nolint:gosec // carries session credential material at runtime
 	IsSubagent        bool
+	// Team collaboration context. Empty when the bot is running outside
+	// a team / issue / handoff scope.
+	TeamID      string
+	IssueID     string
+	HandoffID   string
+	TriggerKind string
+	OwnerUserID string
 }
 
 // SkillEntry represents a skill loaded from the bot container.

@@ -8,6 +8,53 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AgentHandoff struct {
+	ID               pgtype.UUID        `json:"id"`
+	TeamID           pgtype.UUID        `json:"team_id"`
+	IssueID          pgtype.UUID        `json:"issue_id"`
+	FromActorType    string             `json:"from_actor_type"`
+	FromBotID        pgtype.UUID        `json:"from_bot_id"`
+	FromUserID       pgtype.UUID        `json:"from_user_id"`
+	ToBotID          pgtype.UUID        `json:"to_bot_id"`
+	TriggerCommentID pgtype.UUID        `json:"trigger_comment_id"`
+	SourceSessionID  pgtype.UUID        `json:"source_session_id"`
+	TargetSessionID  pgtype.UUID        `json:"target_session_id"`
+	ResultCommentID  pgtype.UUID        `json:"result_comment_id"`
+	ReturnHandoffID  pgtype.UUID        `json:"return_handoff_id"`
+	Status           string             `json:"status"`
+	FailureReason    string             `json:"failure_reason"`
+	Metadata         []byte             `json:"metadata"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
+}
+
+type AgentTeam struct {
+	ID            pgtype.UUID        `json:"id"`
+	OwnerUserID   pgtype.UUID        `json:"owner_user_id"`
+	Name          string             `json:"name"`
+	Description   string             `json:"description"`
+	SharedDirName string             `json:"shared_dir_name"`
+	Instructions  string             `json:"instructions"`
+	Metadata      []byte             `json:"metadata"`
+	ArchivedAt    pgtype.Timestamptz `json:"archived_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AgentTeamMember struct {
+	ID           pgtype.UUID        `json:"id"`
+	TeamID       pgtype.UUID        `json:"team_id"`
+	MemberType   string             `json:"member_type"`
+	BotID        pgtype.UUID        `json:"bot_id"`
+	UserID       pgtype.UUID        `json:"user_id"`
+	Role         string             `json:"role"`
+	Instructions string             `json:"instructions"`
+	Metadata     []byte             `json:"metadata"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Bot struct {
 	ID                     pgtype.UUID        `json:"id"`
 	OwnerUserID            pgtype.UUID        `json:"owner_user_id"`
@@ -466,6 +513,57 @@ type Task struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	ExecID    pgtype.Text        `json:"exec_id"`
 	Pid       pgtype.Int4        `json:"pid"`
+}
+
+type TeamFileLock struct {
+	ID          pgtype.UUID        `json:"id"`
+	TeamID      pgtype.UUID        `json:"team_id"`
+	Path        string             `json:"path"`
+	Scope       string             `json:"scope"`
+	OwnerType   string             `json:"owner_type"`
+	OwnerBotID  pgtype.UUID        `json:"owner_bot_id"`
+	OwnerUserID pgtype.UUID        `json:"owner_user_id"`
+	IssueID     pgtype.UUID        `json:"issue_id"`
+	SessionID   pgtype.UUID        `json:"session_id"`
+	HandoffID   pgtype.UUID        `json:"handoff_id"`
+	AcquiredAt  pgtype.Timestamptz `json:"acquired_at"`
+	RefreshedAt pgtype.Timestamptz `json:"refreshed_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	Metadata    []byte             `json:"metadata"`
+}
+
+type TeamIssue struct {
+	ID              pgtype.UUID        `json:"id"`
+	TeamID          pgtype.UUID        `json:"team_id"`
+	Number          int32              `json:"number"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	Status          string             `json:"status"`
+	AssigneeType    pgtype.Text        `json:"assignee_type"`
+	AssigneeBotID   pgtype.UUID        `json:"assignee_bot_id"`
+	AssigneeUserID  pgtype.UUID        `json:"assignee_user_id"`
+	CreatedByType   string             `json:"created_by_type"`
+	CreatedByBotID  pgtype.UUID        `json:"created_by_bot_id"`
+	CreatedByUserID pgtype.UUID        `json:"created_by_user_id"`
+	ParentIssueID   pgtype.UUID        `json:"parent_issue_id"`
+	Metadata        []byte             `json:"metadata"`
+	ClosedAt        pgtype.Timestamptz `json:"closed_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type TeamIssueComment struct {
+	ID              pgtype.UUID        `json:"id"`
+	IssueID         pgtype.UUID        `json:"issue_id"`
+	TeamID          pgtype.UUID        `json:"team_id"`
+	ParentCommentID pgtype.UUID        `json:"parent_comment_id"`
+	AuthorType      string             `json:"author_type"`
+	AuthorBotID     pgtype.UUID        `json:"author_bot_id"`
+	AuthorUserID    pgtype.UUID        `json:"author_user_id"`
+	Content         string             `json:"content"`
+	Metadata        []byte             `json:"metadata"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ToolApprovalRequest struct {

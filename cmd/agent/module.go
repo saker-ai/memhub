@@ -8,6 +8,7 @@ import (
 
 	"github.com/memohai/memoh/internal/accounts"
 	"github.com/memohai/memoh/internal/acl"
+	"github.com/memohai/memoh/internal/agentteam"
 	audiopkg "github.com/memohai/memoh/internal/audio"
 	"github.com/memohai/memoh/internal/boot"
 	"github.com/memohai/memoh/internal/bots"
@@ -51,6 +52,8 @@ func options() fx.Option {
 			provideSQLiteStore,
 			provideDBQueries,
 			provideAccountStore,
+			provideAgentTeamStore,
+			agentteam.NewService,
 			provideWorkspaceManager,
 			provideBridgeProvider,
 			provideMemoryLLM,
@@ -119,6 +122,7 @@ func options() fx.Option {
 			provideServerHandler(handlers.NewSettingsHandler),
 			provideServerHandler(handlers.NewToolApprovalHandler),
 			provideServerHandler(handlers.NewACLHandler),
+			provideServerHandler(provideAgentTeamHandler),
 			provideServerHandler(handlers.NewScheduleHandler),
 			provideServerHandler(handlers.NewHeartbeatHandler),
 			provideServerHandler(handlers.NewCompactionHandler),

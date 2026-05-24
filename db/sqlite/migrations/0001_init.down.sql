@@ -3,6 +3,12 @@
 
 PRAGMA foreign_keys = OFF;
 
+DROP TABLE IF EXISTS team_file_locks;
+DROP TABLE IF EXISTS agent_handoffs;
+DROP TABLE IF EXISTS team_issue_comments;
+DROP TABLE IF EXISTS team_issues;
+DROP TABLE IF EXISTS agent_team_members;
+DROP TABLE IF EXISTS agent_teams;
 DROP TABLE IF EXISTS user_provider_oauth_tokens;
 DROP TABLE IF EXISTS provider_oauth_tokens;
 DROP TABLE IF EXISTS email_outbox;

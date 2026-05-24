@@ -50,10 +50,24 @@ provide(openInFileManagerKey, (path: string, isDir = false) => {
 })
 
 const urlBotId = ((route.params.botId as string) ?? '').trim()
+const urlSessionId = ((route.query.session as string) ?? '').trim()
 
 if (urlBotId) {
-  void chatStore.selectBot(urlBotId)
+  void chatStore.selectBot(urlBotId).then(() => {
+    if (urlSessionId) {
+      void chatStore.selectSession(urlSessionId)
+    }
+  })
 }
+
+watch(
+  () => route.query.session,
+  async (raw) => {
+    const sid = (typeof raw === 'string' ? raw : '').trim()
+    if (!sid) return
+    await chatStore.selectSession(sid)
+  },
+)
 
 let suppressUrlSync = false
 

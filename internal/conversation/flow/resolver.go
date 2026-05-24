@@ -22,9 +22,11 @@ import (
 	"github.com/memohai/memoh/internal/accounts"
 	agentpkg "github.com/memohai/memoh/internal/agent"
 	"github.com/memohai/memoh/internal/agent/background"
+	"github.com/memohai/memoh/internal/agentteam"
 	"github.com/memohai/memoh/internal/channel"
 	"github.com/memohai/memoh/internal/compaction"
 	"github.com/memohai/memoh/internal/conversation"
+	"github.com/memohai/memoh/internal/db"
 	"github.com/memohai/memoh/internal/db/postgres/sqlc"
 	dbstore "github.com/memohai/memoh/internal/db/store"
 	memprovider "github.com/memohai/memoh/internal/memory/adapters"
@@ -34,6 +36,7 @@ import (
 	"github.com/memohai/memoh/internal/oauthctx"
 	pipelinepkg "github.com/memohai/memoh/internal/pipeline"
 	"github.com/memohai/memoh/internal/providers"
+	sessionpkg "github.com/memohai/memoh/internal/session"
 	"github.com/memohai/memoh/internal/settings"
 	"github.com/memohai/memoh/internal/toolapproval"
 )
@@ -87,6 +90,7 @@ type Resolver struct {
 	skillLoader       SkillLoader
 	assetLoader       gatewayAssetLoader
 	channelStore      botChannelConfigReader
+	teamService       *agentteam.Service
 	pipeline          *pipelinepkg.Pipeline
 	streamHTTPClient  *http.Client
 	bgManager         *background.Manager
@@ -157,6 +161,409 @@ func NewResolver(
 // SetMemoryRegistry sets the provider registry for memory operations.
 func (r *Resolver) SetMemoryRegistry(registry *memprovider.Registry) {
 	r.memoryRegistry = registry
+}
+
+// SetTeamService injects the agentteam service used to assemble team-aware
+// prompt sections.
+func (r *Resolver) SetTeamService(svc *agentteam.Service) {
+	r.teamService = svc
+}
+
+// TriggerHandoff runs the handoff for the target bot. It builds a base
+// run config for the bot, injects team / issue / handoff context, and
+// generates a single agent turn. The bot is expected to post a result
+// comment back to the issue via the team tools; the post-comment hook
+// will then close the handoff and queue a return for the delegator.
+//
+// The conversation is persisted under a stable bot_session keyed on
+// (bot_id, issue_id). This means a bot working on the same issue across
+// multiple handoffs keeps a continuous thread that shows up in its chat
+// sidebar — users can read what the bot actually did, not only the
+// summary comment it posted to the issue.
+func (r *Resolver) TriggerHandoff(ctx context.Context, handoff agentteam.Handoff, triggerComment agentteam.Comment) error {
+	if r.agent == nil {
+		return errors.New("agentteam: agent not configured")
+	}
+	if strings.TrimSpace(handoff.ToBotID) == "" {
+		return errors.New("agentteam: handoff target bot id required")
+	}
+	if r.teamService == nil {
+		return errors.New("agentteam: team service not configured on resolver")
+	}
+	authorName := r.resolveCommentAuthorName(ctx, triggerComment)
+	issue := r.lookupIssue(ctx, handoff.IssueID)
+	// Resolve the bot's session for this handoff. When the dispatcher
+	// pinned an explicit target session (return path: A delegated from
+	// S1 → handoff.target_session_id == S1 → A wakes back up in S1),
+	// honour it verbatim. Otherwise fall back to (bot, issue) so the
+	// target bot has a stable per-issue scratch session across multiple
+	// @mentions on the same issue.
+	sessionID := strings.TrimSpace(handoff.TargetSessionID)
+	if sessionID == "" {
+		var sessErr error
+		sessionID, sessErr = r.ensureHandoffSession(ctx, handoff.ToBotID, handoff.TeamID, handoff.IssueID, issue)
+		if sessErr != nil {
+			r.logger.Warn(
+				"ensure handoff session failed (continuing without persistence)",
+				slog.String("bot_id", handoff.ToBotID),
+				slog.String("issue_id", handoff.IssueID),
+				slog.Any("error", sessErr),
+			)
+		}
+	}
+	req := conversation.ChatRequest{
+		BotID:     handoff.ToBotID,
+		ChatID:    handoff.ToBotID,
+		SessionID: sessionID,
+		Query:     buildHandoffPrompt(handoff, triggerComment, authorName, issue),
+		UserID:    triggerComment.AuthorUserID,
+	}
+	rc, err := r.resolve(ctx, req)
+	if err != nil {
+		return fmt.Errorf("resolve handoff: %w", err)
+	}
+	cfg := rc.runConfig
+	cfg.SessionType = "chat"
+	cfg.Identity.TeamID = handoff.TeamID
+	cfg.Identity.IssueID = handoff.IssueID
+	cfg.Identity.HandoffID = handoff.ID
+	cfg.Identity.TriggerKind = "handoff"
+	if _, err := r.teamService.Store().MarkHandoffDispatched(ctx, handoff.ID, sessionID); err != nil {
+		r.logger.Warn("mark handoff dispatched failed", slog.String("handoff_id", handoff.ID), slog.Any("error", err))
+	}
+	cfg = r.prepareRunConfig(ctx, cfg)
+	result, err := r.agent.Generate(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("agent generate: %w", err)
+	}
+	if sessionID != "" {
+		outputMessages := sdkMessagesToModelMessages(result.Messages)
+		roundMessages := prependUserMessage(req.Query, outputMessages)
+		if storeErr := r.storeRound(ctx, req, roundMessages, rc.model.ID); storeErr != nil {
+			r.logger.Warn(
+				"store handoff round failed",
+				slog.String("handoff_id", handoff.ID),
+				slog.String("session_id", sessionID),
+				slog.Any("error", storeErr),
+			)
+		}
+	}
+	return nil
+}
+
+// ensureHandoffSession looks up (or creates) the stable bot_session row
+// that backs all handoff turns for a given (bot, issue). The session is
+// the single thread a user reads to follow what this bot did on this
+// issue across mention → return → re-mention cycles.
+//
+// Session metadata always carries:
+//
+//	team_id  : the team this session lives under
+//	issue_id : the issue this session is dedicated to
+//	kind     : "team_handoff"
+//
+// We use the `kind` discriminator so a future query can list all handoff
+// sessions distinctly from regular chat sessions.
+func (r *Resolver) ensureHandoffSession(ctx context.Context, botID, teamID, issueID string, issue *agentteam.Issue) (string, error) {
+	if r.sessionService == nil {
+		return "", errors.New("session service not configured")
+	}
+	if strings.TrimSpace(botID) == "" || strings.TrimSpace(issueID) == "" {
+		return "", errors.New("bot id and issue id are required")
+	}
+	sessions, err := r.sessionService.ListByBot(ctx, botID)
+	if err != nil {
+		return "", fmt.Errorf("list bot sessions: %w", err)
+	}
+	for _, s := range sessions {
+		if s.Type != sessionpkg.TypeChat {
+			continue
+		}
+		meta := s.Metadata
+		if meta == nil {
+			continue
+		}
+		if kind, _ := meta["kind"].(string); kind != "team_handoff" {
+			continue
+		}
+		if mIssue, _ := meta["issue_id"].(string); mIssue == issueID {
+			return s.ID, nil
+		}
+	}
+	title := buildHandoffSessionTitle(issue)
+	created, err := r.sessionService.Create(ctx, sessionpkg.CreateInput{
+		BotID: botID,
+		Type:  sessionpkg.TypeChat,
+		Title: title,
+		Metadata: map[string]any{
+			"kind":     "team_handoff",
+			"team_id":  teamID,
+			"issue_id": issueID,
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("create handoff session: %w", err)
+	}
+	return created.ID, nil
+}
+
+func buildHandoffSessionTitle(issue *agentteam.Issue) string {
+	if issue == nil {
+		return "Team issue"
+	}
+	title := strings.TrimSpace(issue.Title)
+	if title == "" {
+		return fmt.Sprintf("Issue #%d", issue.Number)
+	}
+	return fmt.Sprintf("Issue #%d %s", issue.Number, title)
+}
+
+// resolveCommentAuthorName returns the display name of a comment's author
+// (bot or user). Falls back to a stable string when the author row cannot
+// be resolved so the prompt never leaves the bot guessing.
+func (r *Resolver) resolveCommentAuthorName(ctx context.Context, c agentteam.Comment) string {
+	switch c.AuthorType {
+	case agentteam.ActorBot:
+		if name := r.lookupBotDisplayName(ctx, c.AuthorBotID); name != "" {
+			return name
+		}
+		return "another bot"
+	case agentteam.ActorUser:
+		if name := r.lookupUserDisplayName(ctx, c.AuthorUserID); name != "" {
+			return name
+		}
+		return "a teammate"
+	case agentteam.ActorSystem:
+		return "the platform"
+	}
+	return "a teammate"
+}
+
+func (r *Resolver) lookupBotDisplayName(ctx context.Context, botID string) string {
+	if r.queries == nil || strings.TrimSpace(botID) == "" {
+		return ""
+	}
+	uuid, err := db.ParseUUID(botID)
+	if err != nil {
+		return ""
+	}
+	row, err := r.queries.GetBotByID(ctx, uuid)
+	if err != nil || !row.DisplayName.Valid {
+		return ""
+	}
+	return strings.TrimSpace(row.DisplayName.String)
+}
+
+func (r *Resolver) lookupUserDisplayName(ctx context.Context, userID string) string {
+	if r.queries == nil || strings.TrimSpace(userID) == "" {
+		return ""
+	}
+	uuid, err := db.ParseUUID(userID)
+	if err != nil {
+		return ""
+	}
+	row, err := r.queries.GetUserByID(ctx, uuid)
+	if err != nil {
+		return ""
+	}
+	if row.DisplayName.Valid && strings.TrimSpace(row.DisplayName.String) != "" {
+		return strings.TrimSpace(row.DisplayName.String)
+	}
+	if row.Username.Valid && strings.TrimSpace(row.Username.String) != "" {
+		return strings.TrimSpace(row.Username.String)
+	}
+	return ""
+}
+
+func (r *Resolver) lookupIssue(ctx context.Context, issueID string) *agentteam.Issue {
+	if r.teamService == nil || strings.TrimSpace(issueID) == "" {
+		return nil
+	}
+	issue, err := r.teamService.GetIssue(ctx, issueID)
+	if err != nil {
+		return nil
+	}
+	return &issue
+}
+
+// buildHandoffPrompt composes the user-message payload Bot2 sees on the
+// turn that delivers a handoff. It states three things explicitly so the
+// bot never has to guess:
+//
+//  1. WHO is talking to it (resolved display name + actor type).
+//  2. WHICH issue this is about (title + number, when available).
+//  3. WHAT was said — the verbatim triggering comment body.
+//
+// It also pins the **routing contract**: the bot's `issue_comment` reply
+// is auto-threaded under the triggering comment so the dispatcher can
+// match it back to *this* handoff (and route the return to the right
+// originating session). Bots are told not to override `parent_comment_id`
+// unless they really mean to leave the thread.
+//
+// Two flavours:
+//   - Initial @mention: "<Alice> @-mentioned you on issue #N <Title>" + comment text.
+//   - Return handoff   : "Your earlier delegation came back — <Worker> posted an
+//     update on issue #N. Evaluate and continue or exit silently."
+func buildHandoffPrompt(handoff agentteam.Handoff, comment agentteam.Comment, authorName string, issue *agentteam.Issue) string {
+	header := buildIssueHeader(issue)
+	if handoff.FromActorType == agentteam.ActorSystem && comment.AuthorType == agentteam.ActorBot {
+		return strings.TrimSpace(
+			"Your earlier delegation on " + header + " has come back. **" + authorName + "** just posted an update.\n\n" +
+				"Evaluate the result: continue with the next step, delegate further (`@<Name>`), or exit silently if no action is needed. " +
+				"This wake-up is targeted at the originating session — your reply lands wherever you were before, not in a new chat.\n\n" +
+				"## Update from " + authorName + "\n\n" + comment.Content,
+		)
+	}
+	return strings.TrimSpace(
+		"**" + authorName + "** (" + string(comment.AuthorType) + ") just @mentioned you on " + header + ".\n\n" +
+			"Read the message below and reply by calling the `issue_comment` tool — the reply is automatically threaded under their @mention so the platform can route the return back to whichever session " + authorName + " sent this from. " +
+			"Do NOT override `parent_comment_id` unless you really want to leave this thread. " +
+			"Address them by name when you reply. If no action is needed, you may exit silently.\n\n" +
+			"## Message from " + authorName + "\n\n" + comment.Content,
+	)
+}
+
+// buildIssueHeader renders a short identifier for the issue the handoff
+// belongs to. Falls back to "the team issue" when the issue row could not
+// be loaded.
+func buildIssueHeader(issue *agentteam.Issue) string {
+	if issue == nil {
+		return "the team issue"
+	}
+	title := strings.TrimSpace(issue.Title)
+	if title == "" {
+		return fmt.Sprintf("issue #%d", issue.Number)
+	}
+	return fmt.Sprintf("issue #%d \"%s\"", issue.Number, title)
+}
+
+// buildSelfIdentitySection assembles the bot's "Who you are" paragraph
+// that sits at the very top of every system prompt. It is the canonical
+// place for `bots.display_name`. Returns an empty string when the bot has
+// no display name configured or when the bot row cannot be loaded.
+//
+// This intentionally does NOT depend on team membership: the bot's name
+// is its own identity regardless of which session type or team context
+// it is running under.
+func (r *Resolver) buildSelfIdentitySection(ctx context.Context, botID string) string {
+	if r.queries == nil || strings.TrimSpace(botID) == "" {
+		return ""
+	}
+	uuid, err := db.ParseUUID(botID)
+	if err != nil {
+		return ""
+	}
+	row, err := r.queries.GetBotByID(ctx, uuid)
+	if err != nil {
+		return ""
+	}
+	name := ""
+	if row.DisplayName.Valid {
+		name = strings.TrimSpace(row.DisplayName.String)
+	}
+	if name == "" {
+		return ""
+	}
+	return "You are **" + name + "**. " +
+		"This is your canonical name across Memoh — refer to yourself by this name, " +
+		"and it is also how other people and bots will @mention you."
+}
+
+// buildTeamSection assembles the team-aware system prompt fragment when the
+// session is scoped to a team. It tells the bot, in order:
+//
+//  1. WHICH TEAM — team name, description, shared-dir display name, team-level instructions.
+//  2. YOUR TEAM ROLE — role + per-team instructions for THIS bot in this team.
+//  3. TEAMMATES — roster of bots and humans with their @-mention tokens.
+//
+// The bot's canonical display name is intentionally NOT repeated here —
+// `buildSelfIdentitySection` already pins it at the top of the prompt.
+//
+// Returns "" outside a team context.
+func (r *Resolver) buildTeamSection(ctx context.Context, teamID, botID string) string {
+	if r.teamService == nil || strings.TrimSpace(teamID) == "" {
+		return ""
+	}
+	team, err := r.teamService.GetTeam(ctx, teamID)
+	if err != nil {
+		if r.logger != nil {
+			r.logger.Debug("team lookup failed", slog.String("team_id", teamID), slog.Any("error", err))
+		}
+		return ""
+	}
+
+	var sb strings.Builder
+
+	// (1) Team context.
+	sb.WriteString("## Active Team\n\n")
+	sb.WriteString("- Team: " + team.Name + "\n")
+	if team.Description != "" {
+		sb.WriteString("- Description: " + team.Description + "\n")
+	}
+	if team.SharedDirName != "" {
+		sb.WriteString("- Shared dir display name: " + team.SharedDirName + " (mounted at `/team`)\n")
+	}
+	if team.Instructions != "" {
+		sb.WriteString("- Team instructions:\n  > " + team.Instructions + "\n")
+	}
+
+	// (2) Your role inside this specific team (only when set — falls
+	// through silently otherwise so a no-role member doesn't clutter the
+	// prompt).
+	if strings.TrimSpace(botID) != "" {
+		if self, mErr := r.teamService.Store().GetMemberByBot(ctx, teamID, botID); mErr == nil {
+			if self.Role != "" || self.Instructions != "" {
+				sb.WriteString("\n### Your role in this team\n\n")
+				if self.Role != "" {
+					sb.WriteString("- Role: " + self.Role + "\n")
+				}
+				if self.Instructions != "" {
+					sb.WriteString("- Team-specific instructions:\n  > " + self.Instructions + "\n")
+				}
+			}
+		}
+	}
+
+	// (3) Teammates.
+	members, err := r.teamService.ListMembers(ctx, teamID)
+	if err == nil && len(members) > 0 {
+		sb.WriteString("\n### Teammates\n\n")
+		for _, m := range members {
+			if m.MemberType == agentteam.MemberBot && m.BotID == botID {
+				continue
+			}
+			label := strings.TrimSpace(m.DisplayName)
+			if label == "" {
+				continue
+			}
+			mention := mentionTokenFor(label)
+			line := "- **" + label + "** — " + string(m.MemberType)
+			if m.Role != "" {
+				line += ", role: " + m.Role
+			}
+			line += " — mention as `" + mention + "`"
+			if m.Instructions != "" {
+				line += "  \n  > " + m.Instructions
+			}
+			sb.WriteString(line + "\n")
+		}
+	}
+
+	return sb.String()
+}
+
+// mentionTokenFor renders the ready-to-paste `@Name` token for a member.
+// Names containing whitespace use the quoted form so they survive the
+// `agentteam.ParseMentions` regex as a single label.
+func mentionTokenFor(name string) string {
+	cleaned := strings.TrimSpace(name)
+	if cleaned == "" {
+		return ""
+	}
+	if strings.ContainsAny(cleaned, " \t") {
+		return `@"` + strings.ReplaceAll(cleaned, `"`, `'`) + `"`
+	}
+	return "@" + cleaned
 }
 
 // SetSkillLoader sets the skill loader used to populate usable skills in gateway requests.
@@ -284,7 +691,8 @@ func (r *Resolver) resolve(ctx context.Context, req conversation.ChatRequest) (r
 		ReasoningEffort:   req.ReasoningEffort,
 	})
 	if err != nil {
-		r.logger.Error("resolve: buildBaseRunConfig failed",
+		r.logger.Error(
+			"resolve: buildBaseRunConfig failed",
 			slog.String("bot_id", req.BotID),
 			slog.Any("error", err),
 		)
@@ -320,7 +728,8 @@ func (r *Resolver) resolve(ctx context.Context, req conversation.ChatRequest) (r
 	} else if r.conversationSvc != nil {
 		loaded, loadErr := r.loadMessages(ctx, req.ChatID, req.SessionID, defaultMaxContextMinutes)
 		if loadErr != nil {
-			r.logger.Error("resolve: loadMessages failed",
+			r.logger.Error(
+				"resolve: loadMessages failed",
 				slog.String("bot_id", req.BotID),
 				slog.Any("error", loadErr),
 			)
@@ -340,7 +749,8 @@ func (r *Resolver) resolve(ctx context.Context, req conversation.ChatRequest) (r
 			compactionThreshold = contextTokenBudget * 70 / 100
 		}
 		if compactionThreshold > 0 && estimatedTokens >= compactionThreshold {
-			r.logger.Warn("resolve: context reached compaction threshold, running synchronous compaction",
+			r.logger.Warn(
+				"resolve: context reached compaction threshold, running synchronous compaction",
 				slog.String("bot_id", req.BotID),
 				slog.Int("estimated_tokens", estimatedTokens),
 				slog.Int("context_token_budget", contextTokenBudget),
@@ -350,7 +760,8 @@ func (r *Resolver) resolve(ctx context.Context, req conversation.ChatRequest) (r
 			// Reload messages after compaction.
 			loaded, loadErr = r.loadMessages(ctx, req.ChatID, req.SessionID, defaultMaxContextMinutes)
 			if loadErr != nil {
-				r.logger.Error("resolve: reload messages after compaction failed",
+				r.logger.Error(
+					"resolve: reload messages after compaction failed",
 					slog.String("bot_id", req.BotID),
 					slog.Any("error", loadErr),
 				)
@@ -741,7 +1152,8 @@ func (r *Resolver) prepareRunConfig(ctx context.Context, cfg agentpkg.RunConfig)
 	if r.channelStore != nil {
 		channelConfigs, err := r.channelStore.ListBotConfigs(ctx, cfg.Identity.BotID)
 		if err != nil {
-			r.logger.Warn("load bot platform identities failed",
+			r.logger.Warn(
+				"load bot platform identities failed",
 				slog.String("bot_id", cfg.Identity.BotID),
 				slog.Any("error", err),
 			)
@@ -749,6 +1161,8 @@ func (r *Resolver) prepareRunConfig(ctx context.Context, cfg agentpkg.RunConfig)
 			platformIdentitiesSection = buildPlatformIdentitiesSection(channelConfigs)
 		}
 	}
+	selfIdentitySection := r.buildSelfIdentitySection(ctx, cfg.Identity.BotID)
+	teamSection := r.buildTeamSection(ctx, cfg.Identity.TeamID, cfg.Identity.BotID)
 	cfg.System = agentpkg.GenerateSystemPrompt(agentpkg.SystemPromptParams{
 		SessionType:               cfg.SessionType,
 		Skills:                    cfg.Skills,
@@ -758,6 +1172,8 @@ func (r *Resolver) prepareRunConfig(ctx context.Context, cfg agentpkg.RunConfig)
 		SupportsImageInput:        supportsImageInput,
 		DisplayEnabled:            cfg.DisplayEnabled,
 		PlatformIdentitiesSection: platformIdentitiesSection,
+		TeamSection:               teamSection,
+		SelfIdentitySection:       selfIdentitySection,
 	})
 
 	if cfg.Query != "" {

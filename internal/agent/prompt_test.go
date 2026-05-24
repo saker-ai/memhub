@@ -24,6 +24,35 @@ func TestGenerateSystemPromptIncludesPlatformIdentitiesInChat(t *testing.T) {
 	}
 }
 
+func TestGenerateSystemPromptIncludesSelfIdentity(t *testing.T) {
+	t.Parallel()
+
+	prompt := GenerateSystemPrompt(SystemPromptParams{
+		SessionType:         "chat",
+		Now:                 time.Unix(1, 0).UTC(),
+		Timezone:            "UTC",
+		SelfIdentitySection: "You are **Memoh Helper**.",
+	})
+
+	if !strings.Contains(prompt, "You are **Memoh Helper**.") {
+		t.Fatalf("expected self-identity section in prompt, got:\n%s", prompt)
+	}
+}
+
+func TestGenerateSystemPromptOmitsSelfIdentityWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	prompt := GenerateSystemPrompt(SystemPromptParams{
+		SessionType: "chat",
+		Now:         time.Unix(1, 0).UTC(),
+		Timezone:    "UTC",
+	})
+
+	if strings.Contains(prompt, "You are **") {
+		t.Fatalf("expected no self-identity wording when section empty")
+	}
+}
+
 func TestGenerateSystemPromptIncludesDisplayToolsWhenEnabled(t *testing.T) {
 	t.Parallel()
 

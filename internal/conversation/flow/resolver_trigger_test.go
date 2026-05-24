@@ -23,6 +23,14 @@ func (f *fakeBackgroundSessionService) Get(ctx context.Context, sessionID string
 	return f.getFn(ctx, sessionID)
 }
 
+func (*fakeBackgroundSessionService) ListByBot(context.Context, string) ([]session.Session, error) {
+	return nil, nil
+}
+
+func (*fakeBackgroundSessionService) Create(context.Context, session.CreateInput) (session.Session, error) {
+	return session.Session{}, nil
+}
+
 func (*fakeBackgroundSessionService) UpdateTitle(context.Context, string, string) (session.Session, error) {
 	return session.Session{}, errors.New("unexpected UpdateTitle call")
 }

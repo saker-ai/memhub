@@ -24,6 +24,7 @@ import (
 	agentpkg "github.com/memohai/memoh/internal/agent"
 	"github.com/memohai/memoh/internal/agent/background"
 	agenttools "github.com/memohai/memoh/internal/agent/tools"
+	"github.com/memohai/memoh/internal/agentteam"
 	audiopkg "github.com/memohai/memoh/internal/audio"
 	"github.com/memohai/memoh/internal/boot"
 	"github.com/memohai/memoh/internal/bots"
@@ -236,6 +237,31 @@ func provideAccountStore(cfg config.Config, postgresStore *postgresstore.Store, 
 	}
 }
 
+func provideAgentTeamHandler(log *slog.Logger, service *agentteam.Service, cfg config.Config) *handlers.AgentTeamHandler {
+	h := handlers.NewAgentTeamHandler(log, service)
+	if root := strings.TrimSpace(cfg.Workspace.DataRoot); root != "" {
+		h.SetTeamFSRoot(stdpath.Join(root, "teams"))
+	}
+	return h
+}
+
+func provideAgentTeamStore(cfg config.Config, postgresStore *postgresstore.Store, sqliteStore *sqlitestore.Store) (agentteam.Store, error) {
+	switch db.DriverFromConfig(cfg) {
+	case db.DriverPostgres:
+		if postgresStore == nil {
+			return nil, errors.New("postgres agentteam store not configured")
+		}
+		return postgresstore.NewAgentTeamStore(postgresStore.SQLC()), nil
+	case db.DriverSQLite:
+		if sqliteStore == nil {
+			return nil, errors.New("sqlite agentteam store not configured")
+		}
+		return sqlitestore.NewAgentTeamStore(sqliteStore), nil
+	default:
+		return nil, fmt.Errorf("unsupported database driver %q", db.DriverFromConfig(cfg))
+	}
+}
+
 func provideBridgeProvider(manage *workspace.Manager) bridge.Provider {
 	return manage
 }
@@ -368,7 +394,7 @@ func injectToolProviders(a *agentpkg.Agent, msgService *message.DBService, provi
 	}
 }
 
-func provideChatResolver(log *slog.Logger, a *agentpkg.Agent, modelsService *models.Service, queries dbstore.Queries, chatService *conversation.Service, msgService *message.DBService, settingsService *settings.Service, accountService *accounts.Service, mediaService *media.Service, containerdHandler *handlers.ContainerdHandler, memoryRegistry *memprovider.Registry, channelStore *channel.Store, routeService *route.DBService, sessionService *sessionpkg.Service, eventHub *event.Hub, compactionService *compaction.Service, pipeline *pipelinepkg.Pipeline, rc *boot.RuntimeConfig, bgManager *background.Manager, toolApproval *toolapproval.Service) *flow.Resolver {
+func provideChatResolver(log *slog.Logger, a *agentpkg.Agent, modelsService *models.Service, queries dbstore.Queries, chatService *conversation.Service, msgService *message.DBService, settingsService *settings.Service, accountService *accounts.Service, mediaService *media.Service, containerdHandler *handlers.ContainerdHandler, memoryRegistry *memprovider.Registry, channelStore *channel.Store, routeService *route.DBService, sessionService *sessionpkg.Service, eventHub *event.Hub, compactionService *compaction.Service, pipeline *pipelinepkg.Pipeline, rc *boot.RuntimeConfig, bgManager *background.Manager, toolApproval *toolapproval.Service, teamService *agentteam.Service) *flow.Resolver {
 	resolver := flow.NewResolver(log, modelsService, queries, chatService, msgService, settingsService, accountService, a, rc.TimezoneLocation, 120*time.Second)
 	resolver.SetMemoryRegistry(memoryRegistry)
 	resolver.SetSkillLoader(&skillLoaderAdapter{handler: containerdHandler})
@@ -381,6 +407,12 @@ func provideChatResolver(log *slog.Logger, a *agentpkg.Agent, modelsService *mod
 	resolver.SetPipeline(pipeline)
 	resolver.SetBackgroundManager(bgManager)
 	resolver.SetToolApprovalService(toolApproval)
+	resolver.SetTeamService(teamService)
+	if teamService != nil {
+		teamService.SetDispatchTrigger(func(ctx context.Context, handoff agentteam.Handoff, trigger agentteam.Comment) error {
+			return resolver.TriggerHandoff(ctx, handoff, trigger)
+		})
+	}
 	if bgManager != nil {
 		bgManager.SetWakeFunc(func(botID, sessionID string) {
 			resolver.TriggerBackgroundNotification(context.Background(), botID, sessionID)
@@ -579,7 +611,7 @@ func provideBackgroundManager(log *slog.Logger) *background.Manager {
 	return background.New(log)
 }
 
-func provideToolProviders(log *slog.Logger, channelManager *channel.Manager, registry *channel.Registry, routeService *route.DBService, scheduleService *schedule.Service, settingsService *settings.Service, searchProviderService *searchproviders.Service, manager *workspace.Manager, mediaService *media.Service, memoryRegistry *memprovider.Registry, emailService *emailpkg.Service, emailManager *emailpkg.Manager, fedGateway *handlers.MCPFederationGateway, mcpConnService *mcp.ConnectionService, modelsService *models.Service, queries dbstore.Queries, audioService *audiopkg.Service, sessionService *sessionpkg.Service, bgManager *background.Manager) []agenttools.ToolProvider {
+func provideToolProviders(log *slog.Logger, channelManager *channel.Manager, registry *channel.Registry, routeService *route.DBService, scheduleService *schedule.Service, settingsService *settings.Service, searchProviderService *searchproviders.Service, manager *workspace.Manager, mediaService *media.Service, memoryRegistry *memprovider.Registry, emailService *emailpkg.Service, emailManager *emailpkg.Manager, fedGateway *handlers.MCPFederationGateway, mcpConnService *mcp.ConnectionService, modelsService *models.Service, queries dbstore.Queries, audioService *audiopkg.Service, sessionService *sessionpkg.Service, bgManager *background.Manager, teamService *agentteam.Service) []agenttools.ToolProvider {
 	var assetResolver messaging.AssetResolver
 	if mediaService != nil {
 		assetResolver = &mediaAssetResolverAdapter{media: mediaService}
@@ -602,6 +634,7 @@ func provideToolProviders(log *slog.Logger, channelManager *channel.Manager, reg
 		agenttools.NewImageGenProvider(log, settingsService, modelsService, queries, manager, config.DefaultDataMount),
 		agenttools.NewFederationProvider(log, fedSource),
 		agenttools.NewHistoryProvider(log, sessionService, queries),
+		agenttools.NewTeamProvider(log, teamService),
 	}
 }
 

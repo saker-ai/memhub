@@ -199,7 +199,8 @@ func (a *Agent) runStream(ctx context.Context, cfg RunConfig, ch chan<- StreamEv
 						if cfg.InjectedRecorder != nil {
 							cfg.InjectedRecorder(text, insertAfter)
 						}
-						a.logger.Info("injected user message into agent stream",
+						a.logger.Info(
+							"injected user message into agent stream",
 							slog.String("bot_id", cfg.Identity.BotID),
 							slog.Int("insert_after", insertAfter),
 							slog.Int("image_parts", len(extra)),
@@ -249,7 +250,8 @@ func (a *Agent) runStream(ctx context.Context, cfg RunConfig, ch chan<- StreamEv
 			sendEvent(ctx, ch, StreamEvent{Type: EventError, Error: fmt.Sprintf("stream start: %v", err)})
 			return
 		}
-		a.logger.Warn("stream start failed, retrying",
+		a.logger.Warn(
+			"stream start failed, retrying",
 			slog.Int("attempt", attempt+1),
 			slog.Int("max_attempts", retryCfg.MaxAttempts),
 			slog.String("error", err.Error()),
@@ -522,7 +524,8 @@ func (a *Agent) runStream(ctx context.Context, cfg RunConfig, ch chan<- StreamEv
 		termEvent.Type = EventAgentEnd
 		// Warn if LLM produced no text and no tool calls — likely a context overflow.
 		if allText.Len() == 0 && stepNumber == 0 {
-			a.logger.Warn("agent produced empty response (no text, no tool calls)",
+			a.logger.Warn(
+				"agent produced empty response (no text, no tool calls)",
 				slog.String("bot_id", cfg.Identity.BotID),
 				slog.Int("input_messages", len(cfg.Messages)),
 				slog.Int("input_tokens", totalUsage.InputTokens),
@@ -595,7 +598,8 @@ func (a *Agent) runGenerate(ctx context.Context, cfg RunConfig) (*GenerateResult
 	}
 
 	opts := a.buildGenerateOptions(cfg, sdkTools, prepareStep)
-	opts = append(opts,
+	opts = append(
+		opts,
 		sdk.WithOnStep(func(step *sdk.StepResult) *sdk.GenerateParams {
 			if cfg.LoopDetection.Enabled {
 				if toolLoopAbortCallIDs.Any() {
@@ -742,6 +746,11 @@ func (a *Agent) assembleTools(ctx context.Context, cfg RunConfig, emitter tools.
 		Skills:             skillsMap,
 		TimezoneLocation:   cfg.Identity.TimezoneLocation,
 		Emitter:            emitter,
+		TeamID:             cfg.Identity.TeamID,
+		IssueID:            cfg.Identity.IssueID,
+		HandoffID:          cfg.Identity.HandoffID,
+		TriggerKind:        cfg.Identity.TriggerKind,
+		OwnerUserID:        cfg.Identity.OwnerUserID,
 	}
 
 	var allTools []sdk.Tool
@@ -876,7 +885,8 @@ func drainBackgroundNotifications(
 	notifications := mgr.DrainNotifications(botID, sessionID)
 	for _, n := range notifications {
 		p.Messages = append(p.Messages, sdk.UserMessage(n.MessageText()))
-		logger.Info("injected background task notification",
+		logger.Info(
+			"injected background task notification",
 			slog.String("task_id", n.TaskID),
 			slog.String("status", string(n.Status)),
 			slog.Bool("stalled", n.Stalled),
@@ -1046,7 +1056,8 @@ func (a *Agent) runMidStreamRetry(
 
 	retryCfg := DefaultRetryConfig()
 	for attempt := 0; attempt < retryCfg.MaxAttempts; attempt++ {
-		a.logger.Warn("mid-stream error, retrying",
+		a.logger.Warn(
+			"mid-stream error, retrying",
 			slog.Int("step", stepNumber),
 			slog.Int("attempt", attempt+1),
 			slog.Int("max_attempts", retryCfg.MaxAttempts),
@@ -1077,7 +1088,8 @@ func (a *Agent) runMidStreamRetry(
 
 		retryResult, retryErr := a.client.StreamText(streamCtx, retryOpts...)
 		if retryErr != nil {
-			a.logger.Warn("mid-stream retry failed to start",
+			a.logger.Warn(
+				"mid-stream retry failed to start",
 				slog.Int("attempt", attempt+1),
 				slog.String("error", retryErr.Error()),
 			)

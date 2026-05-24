@@ -844,6 +844,12 @@ export type GithubComMemohaiMemohInternalMcpConnection = {
     updated_at?: string;
 };
 
+export type HandlersAssignIssueRequest = {
+    assignee_bot_id?: string;
+    assignee_type?: string;
+    assignee_user_id?: string;
+};
+
 export type HandlersBatchDeleteRequest = {
     ids?: Array<string>;
 };
@@ -862,6 +868,20 @@ export type HandlersChannelMeta = {
     target_spec?: ChannelTargetSpec;
     type?: string;
     user_config_schema?: ChannelConfigSchema;
+};
+
+export type HandlersCommentResponse = {
+    author_bot_id?: string;
+    author_type?: string;
+    author_user_id?: string;
+    content?: string;
+    created_at?: string;
+    id?: string;
+    issue_id?: string;
+    metadata?: Array<number>;
+    parent_comment_id?: string;
+    team_id?: string;
+    updated_at?: string;
 };
 
 export type HandlersContainerCpuMetricsResponse = {
@@ -903,6 +923,12 @@ export type HandlersContextUsage = {
     used_tokens?: number;
 };
 
+export type HandlersCreateCommentRequest = {
+    content?: string;
+    metadata?: Array<number>;
+    parent_comment_id?: string;
+};
+
 export type HandlersCreateContainerRequest = {
     gpu?: HandlersContainerGpuRequest;
     image?: string;
@@ -924,6 +950,26 @@ export type HandlersCreateContainerResponse = {
     workspace_backend?: string;
 };
 
+export type HandlersCreateIssueRequest = {
+    assignee_bot_id?: string;
+    assignee_type?: string;
+    assignee_user_id?: string;
+    description?: string;
+    metadata?: Array<number>;
+    parent_issue_id?: string;
+    status?: string;
+    title?: string;
+};
+
+export type HandlersCreateMemberRequest = {
+    bot_id?: string;
+    instructions?: string;
+    member_type?: string;
+    metadata?: Array<number>;
+    role?: string;
+    user_id?: string;
+};
+
 export type HandlersCreateSnapshotRequest = {
     snapshot_name?: string;
 };
@@ -936,6 +982,14 @@ export type HandlersCreateSnapshotResponse = {
     snapshotter?: string;
     source?: string;
     version?: number;
+};
+
+export type HandlersCreateTeamRequest = {
+    description?: string;
+    instructions?: string;
+    metadata?: Array<number>;
+    name?: string;
+    shared_dir_name?: string;
 };
 
 export type HandlersDailyTokenUsage = {
@@ -1032,6 +1086,27 @@ export type HandlersGetContainerResponse = {
     workspace_backend?: string;
 };
 
+export type HandlersHandoffResponse = {
+    completed_at?: string;
+    created_at?: string;
+    failure_reason?: string;
+    from_actor_type?: string;
+    from_bot_id?: string;
+    from_user_id?: string;
+    id?: string;
+    issue_id?: string;
+    metadata?: Array<number>;
+    result_comment_id?: string;
+    return_handoff_id?: string;
+    source_session_id?: string;
+    status?: string;
+    target_session_id?: string;
+    team_id?: string;
+    to_bot_id?: string;
+    trigger_comment_id?: string;
+    updated_at?: string;
+};
+
 export type HandlersInstallMcpRequest = {
     env?: {
         [key: string]: string;
@@ -1041,6 +1116,26 @@ export type HandlersInstallMcpRequest = {
 
 export type HandlersInstallSkillRequest = {
     skill_id?: string;
+};
+
+export type HandlersIssueResponse = {
+    assignee_bot_id?: string;
+    assignee_type?: string;
+    assignee_user_id?: string;
+    closed_at?: string;
+    created_at?: string;
+    created_by_bot_id?: string;
+    created_by_type?: string;
+    created_by_user_id?: string;
+    description?: string;
+    id?: string;
+    metadata?: Array<number>;
+    number?: number;
+    parent_issue_id?: string;
+    status?: string;
+    team_id?: string;
+    title?: string;
+    updated_at?: string;
 };
 
 export type HandlersListSnapshotsResponse = {
@@ -1084,6 +1179,20 @@ export type HandlersMcpStdioResponse = {
     connection_id?: string;
     tools?: Array<string>;
     url?: string;
+};
+
+export type HandlersMemberResponse = {
+    bot_id?: string;
+    created_at?: string;
+    display_name?: string;
+    id?: string;
+    instructions?: string;
+    member_type?: string;
+    metadata?: Array<number>;
+    role?: string;
+    team_id?: string;
+    updated_at?: string;
+    user_id?: string;
 };
 
 export type HandlersModelTokenUsage = {
@@ -1238,6 +1347,19 @@ export type HandlersSupermarketTagsResponse = {
     tags?: Array<string>;
 };
 
+export type HandlersTeamResponse = {
+    archived_at?: string;
+    created_at?: string;
+    description?: string;
+    id?: string;
+    instructions?: string;
+    metadata?: Array<number>;
+    name?: string;
+    owner_user_id?: string;
+    shared_dir_name?: string;
+    updated_at?: string;
+};
+
 export type HandlersTokenUsageRecord = {
     cache_read_tokens?: number;
     created_at?: string;
@@ -1275,6 +1397,30 @@ export type HandlersTriggerCompactResponse = {
     summary?: string;
 };
 
+export type HandlersUpdateIssueRequest = {
+    assignee_bot_id?: string;
+    assignee_type?: string;
+    assignee_user_id?: string;
+    description?: string;
+    metadata?: Array<number>;
+    status?: string;
+    title?: string;
+};
+
+export type HandlersUpdateMemberRequest = {
+    instructions?: string;
+    metadata?: Array<number>;
+    role?: string;
+};
+
+export type HandlersUpdateTeamRequest = {
+    description?: string;
+    instructions?: string;
+    metadata?: Array<number>;
+    name?: string;
+    shared_dir_name?: string;
+};
+
 export type HandlersCreateSessionRequest = {
     channel_type?: string;
     metadata?: {
@@ -1284,6 +1430,7 @@ export type HandlersCreateSessionRequest = {
 };
 
 export type HandlersDisplayInfoResponse = {
+    a11y_available?: boolean;
     available?: boolean;
     browser_available?: boolean;
     desktop_available?: boolean;
@@ -7328,6 +7475,22 @@ export type GetEmailOauthCallbackResponses = {
 
 export type GetEmailOauthCallbackResponse = GetEmailOauthCallbackResponses[keyof GetEmailOauthCallbackResponses];
 
+export type GetIssuesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/issues';
+};
+
+export type GetIssuesResponses = {
+    /**
+     * OK
+     */
+    200: Array<HandlersIssueResponse>;
+};
+
+export type GetIssuesResponse = GetIssuesResponses[keyof GetIssuesResponses];
+
 export type GetMemoryProvidersData = {
     body?: never;
     path?: never;
@@ -9159,6 +9322,451 @@ export type GetSupermarketTagsResponses = {
 };
 
 export type GetSupermarketTagsResponse = GetSupermarketTagsResponses[keyof GetSupermarketTagsResponses];
+
+export type GetTeamsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/teams';
+};
+
+export type GetTeamsResponses = {
+    /**
+     * OK
+     */
+    200: Array<HandlersTeamResponse>;
+};
+
+export type GetTeamsResponse = GetTeamsResponses[keyof GetTeamsResponses];
+
+export type PostTeamsData = {
+    /**
+     * Team payload
+     */
+    body: HandlersCreateTeamRequest;
+    path?: never;
+    query?: never;
+    url: '/teams';
+};
+
+export type PostTeamsErrors = {
+    /**
+     * Bad Request
+     */
+    400: HandlersErrorResponse;
+};
+
+export type PostTeamsError = PostTeamsErrors[keyof PostTeamsErrors];
+
+export type PostTeamsResponses = {
+    /**
+     * Created
+     */
+    201: HandlersTeamResponse;
+};
+
+export type PostTeamsResponse = PostTeamsResponses[keyof PostTeamsResponses];
+
+export type DeleteTeamsByTeamIdData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}';
+};
+
+export type DeleteTeamsByTeamIdResponses = {
+    /**
+     * No Content
+     */
+    204: unknown;
+};
+
+export type GetTeamsByTeamIdData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}';
+};
+
+export type GetTeamsByTeamIdErrors = {
+    /**
+     * Not Found
+     */
+    404: HandlersErrorResponse;
+};
+
+export type GetTeamsByTeamIdError = GetTeamsByTeamIdErrors[keyof GetTeamsByTeamIdErrors];
+
+export type GetTeamsByTeamIdResponses = {
+    /**
+     * OK
+     */
+    200: HandlersTeamResponse;
+};
+
+export type GetTeamsByTeamIdResponse = GetTeamsByTeamIdResponses[keyof GetTeamsByTeamIdResponses];
+
+export type PutTeamsByTeamIdData = {
+    /**
+     * Update payload
+     */
+    body: HandlersUpdateTeamRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}';
+};
+
+export type PutTeamsByTeamIdResponses = {
+    /**
+     * OK
+     */
+    200: HandlersTeamResponse;
+};
+
+export type PutTeamsByTeamIdResponse = PutTeamsByTeamIdResponses[keyof PutTeamsByTeamIdResponses];
+
+export type GetTeamsByTeamIdIssuesData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: {
+        /**
+         * Only return open issues when set to 'open'
+         */
+        status?: string;
+    };
+    url: '/teams/{team_id}/issues';
+};
+
+export type GetTeamsByTeamIdIssuesResponses = {
+    /**
+     * OK
+     */
+    200: Array<HandlersIssueResponse>;
+};
+
+export type GetTeamsByTeamIdIssuesResponse = GetTeamsByTeamIdIssuesResponses[keyof GetTeamsByTeamIdIssuesResponses];
+
+export type PostTeamsByTeamIdIssuesData = {
+    /**
+     * Issue payload
+     */
+    body: HandlersCreateIssueRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/issues';
+};
+
+export type PostTeamsByTeamIdIssuesResponses = {
+    /**
+     * Created
+     */
+    201: HandlersIssueResponse;
+};
+
+export type PostTeamsByTeamIdIssuesResponse = PostTeamsByTeamIdIssuesResponses[keyof PostTeamsByTeamIdIssuesResponses];
+
+export type DeleteTeamsByTeamIdIssuesByIssueIdData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Issue ID
+         */
+        issue_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/issues/{issue_id}';
+};
+
+export type DeleteTeamsByTeamIdIssuesByIssueIdResponses = {
+    /**
+     * No Content
+     */
+    204: unknown;
+};
+
+export type GetTeamsByTeamIdIssuesByIssueIdData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Issue ID
+         */
+        issue_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/issues/{issue_id}';
+};
+
+export type GetTeamsByTeamIdIssuesByIssueIdResponses = {
+    /**
+     * OK
+     */
+    200: HandlersIssueResponse;
+};
+
+export type GetTeamsByTeamIdIssuesByIssueIdResponse = GetTeamsByTeamIdIssuesByIssueIdResponses[keyof GetTeamsByTeamIdIssuesByIssueIdResponses];
+
+export type PutTeamsByTeamIdIssuesByIssueIdData = {
+    /**
+     * Issue payload
+     */
+    body: HandlersUpdateIssueRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Issue ID
+         */
+        issue_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/issues/{issue_id}';
+};
+
+export type PutTeamsByTeamIdIssuesByIssueIdResponses = {
+    /**
+     * OK
+     */
+    200: HandlersIssueResponse;
+};
+
+export type PutTeamsByTeamIdIssuesByIssueIdResponse = PutTeamsByTeamIdIssuesByIssueIdResponses[keyof PutTeamsByTeamIdIssuesByIssueIdResponses];
+
+export type PostTeamsByTeamIdIssuesByIssueIdAssignData = {
+    /**
+     * Assignment
+     */
+    body: HandlersAssignIssueRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Issue ID
+         */
+        issue_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/issues/{issue_id}/assign';
+};
+
+export type PostTeamsByTeamIdIssuesByIssueIdAssignResponses = {
+    /**
+     * OK
+     */
+    200: HandlersIssueResponse;
+};
+
+export type PostTeamsByTeamIdIssuesByIssueIdAssignResponse = PostTeamsByTeamIdIssuesByIssueIdAssignResponses[keyof PostTeamsByTeamIdIssuesByIssueIdAssignResponses];
+
+export type GetTeamsByTeamIdIssuesByIssueIdCommentsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Issue ID
+         */
+        issue_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/issues/{issue_id}/comments';
+};
+
+export type GetTeamsByTeamIdIssuesByIssueIdCommentsResponses = {
+    /**
+     * OK
+     */
+    200: Array<HandlersCommentResponse>;
+};
+
+export type GetTeamsByTeamIdIssuesByIssueIdCommentsResponse = GetTeamsByTeamIdIssuesByIssueIdCommentsResponses[keyof GetTeamsByTeamIdIssuesByIssueIdCommentsResponses];
+
+export type PostTeamsByTeamIdIssuesByIssueIdCommentsData = {
+    /**
+     * Comment payload
+     */
+    body: HandlersCreateCommentRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Issue ID
+         */
+        issue_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/issues/{issue_id}/comments';
+};
+
+export type PostTeamsByTeamIdIssuesByIssueIdCommentsResponses = {
+    /**
+     * Created
+     */
+    201: HandlersCommentResponse;
+};
+
+export type PostTeamsByTeamIdIssuesByIssueIdCommentsResponse = PostTeamsByTeamIdIssuesByIssueIdCommentsResponses[keyof PostTeamsByTeamIdIssuesByIssueIdCommentsResponses];
+
+export type GetTeamsByTeamIdIssuesByIssueIdHandoffsData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Issue ID
+         */
+        issue_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/issues/{issue_id}/handoffs';
+};
+
+export type GetTeamsByTeamIdIssuesByIssueIdHandoffsResponses = {
+    /**
+     * OK
+     */
+    200: Array<HandlersHandoffResponse>;
+};
+
+export type GetTeamsByTeamIdIssuesByIssueIdHandoffsResponse = GetTeamsByTeamIdIssuesByIssueIdHandoffsResponses[keyof GetTeamsByTeamIdIssuesByIssueIdHandoffsResponses];
+
+export type GetTeamsByTeamIdMembersData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/members';
+};
+
+export type GetTeamsByTeamIdMembersResponses = {
+    /**
+     * OK
+     */
+    200: Array<HandlersMemberResponse>;
+};
+
+export type GetTeamsByTeamIdMembersResponse = GetTeamsByTeamIdMembersResponses[keyof GetTeamsByTeamIdMembersResponses];
+
+export type PostTeamsByTeamIdMembersData = {
+    /**
+     * Member payload
+     */
+    body: HandlersCreateMemberRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/members';
+};
+
+export type PostTeamsByTeamIdMembersResponses = {
+    /**
+     * Created
+     */
+    201: HandlersMemberResponse;
+};
+
+export type PostTeamsByTeamIdMembersResponse = PostTeamsByTeamIdMembersResponses[keyof PostTeamsByTeamIdMembersResponses];
+
+export type DeleteTeamsByTeamIdMembersByMemberIdData = {
+    body?: never;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Member ID
+         */
+        member_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/members/{member_id}';
+};
+
+export type DeleteTeamsByTeamIdMembersByMemberIdResponses = {
+    /**
+     * No Content
+     */
+    204: unknown;
+};
+
+export type PutTeamsByTeamIdMembersByMemberIdData = {
+    /**
+     * Member payload
+     */
+    body: HandlersUpdateMemberRequest;
+    path: {
+        /**
+         * Team ID
+         */
+        team_id: string;
+        /**
+         * Member ID
+         */
+        member_id: string;
+    };
+    query?: never;
+    url: '/teams/{team_id}/members/{member_id}';
+};
+
+export type PutTeamsByTeamIdMembersByMemberIdResponses = {
+    /**
+     * OK
+     */
+    200: HandlersMemberResponse;
+};
+
+export type PutTeamsByTeamIdMembersByMemberIdResponse = PutTeamsByTeamIdMembersByMemberIdResponses[keyof PutTeamsByTeamIdMembersByMemberIdResponses];
 
 export type GetTranscriptionModelsData = {
     body?: never;

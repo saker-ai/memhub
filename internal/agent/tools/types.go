@@ -84,6 +84,14 @@ type SessionContext struct {
 	Skills             map[string]SkillDetail
 	TimezoneLocation   *time.Location
 	Emitter            StreamEmitter
+	// Team collaboration context. Empty when the bot is running outside a
+	// team / issue / handoff. When non-empty, team-aware tools may scope
+	// their effects (issue comments, shared FS access, handoff return).
+	TeamID      string
+	IssueID     string
+	HandoffID   string
+	TriggerKind string // e.g. "chat" | "issue_comment" | "handoff_return"
+	OwnerUserID string
 }
 
 // IsSameConversation reports whether the given platform+target pair refers to

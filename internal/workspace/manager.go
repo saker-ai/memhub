@@ -314,6 +314,16 @@ func (m *Manager) buildWorkspaceContainerSpec(ctx context.Context, botID string,
 			Options:     []string{"rbind", "rw"},
 		},
 	}
+	if teamRoot := m.teamSharedRoot(); teamRoot != "" {
+		if err := os.MkdirAll(teamRoot, 0o750); err == nil { //nolint:gosec // group-readable shared team dir
+			mounts = append(mounts, ctr.MountSpec{
+				Destination: "/team",
+				Type:        "bind",
+				Source:      teamRoot,
+				Options:     []string{"rbind", "rw"},
+			})
+		}
+	}
 	tzMounts, tzEnv := ctr.TimezoneSpec()
 	mounts = append(mounts, tzMounts...)
 
@@ -326,7 +336,8 @@ func (m *Manager) buildWorkspaceContainerSpec(ctx context.Context, botID string,
 	env = append(env, tzEnv...)
 	env = append(env, "BRIDGE_SOCKET_PATH=/run/memoh/bridge.sock")
 	if m.botDisplayEnabled(ctx, botID) {
-		env = append(env,
+		env = append(
+			env,
 			"MEMOH_DISPLAY_ENABLED=true",
 			"MEMOH_DISPLAY_RFB_TCP_ADDR=127.0.0.1:5999",
 			"DISPLAY=:99",
@@ -606,6 +617,16 @@ func (m *Manager) Delete(ctx context.Context, botID string, preserveData bool) e
 
 func (m *Manager) dataRoot() string {
 	return m.cfg.DataRootPath()
+}
+
+// teamSharedRoot returns the host path that backs `/team` inside the
+// workspace. Empty when the data root is not configured.
+func (m *Manager) teamSharedRoot() string {
+	root := strings.TrimSpace(m.dataRoot())
+	if root == "" {
+		return ""
+	}
+	return filepath.Join(root, "teams")
 }
 
 func (m *Manager) imageRef() string {

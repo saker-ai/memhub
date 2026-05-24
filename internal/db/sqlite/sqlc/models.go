@@ -8,6 +8,53 @@ import (
 	"database/sql"
 )
 
+type AgentHandoff struct {
+	ID               string         `json:"id"`
+	TeamID           string         `json:"team_id"`
+	IssueID          sql.NullString `json:"issue_id"`
+	FromActorType    string         `json:"from_actor_type"`
+	FromBotID        sql.NullString `json:"from_bot_id"`
+	FromUserID       sql.NullString `json:"from_user_id"`
+	ToBotID          string         `json:"to_bot_id"`
+	TriggerCommentID sql.NullString `json:"trigger_comment_id"`
+	SourceSessionID  sql.NullString `json:"source_session_id"`
+	TargetSessionID  sql.NullString `json:"target_session_id"`
+	ResultCommentID  sql.NullString `json:"result_comment_id"`
+	ReturnHandoffID  sql.NullString `json:"return_handoff_id"`
+	Status           string         `json:"status"`
+	FailureReason    string         `json:"failure_reason"`
+	Metadata         string         `json:"metadata"`
+	CreatedAt        string         `json:"created_at"`
+	UpdatedAt        string         `json:"updated_at"`
+	CompletedAt      sql.NullString `json:"completed_at"`
+}
+
+type AgentTeam struct {
+	ID            string         `json:"id"`
+	OwnerUserID   string         `json:"owner_user_id"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	SharedDirName string         `json:"shared_dir_name"`
+	Instructions  string         `json:"instructions"`
+	Metadata      string         `json:"metadata"`
+	ArchivedAt    sql.NullString `json:"archived_at"`
+	CreatedAt     string         `json:"created_at"`
+	UpdatedAt     string         `json:"updated_at"`
+}
+
+type AgentTeamMember struct {
+	ID           string         `json:"id"`
+	TeamID       string         `json:"team_id"`
+	MemberType   string         `json:"member_type"`
+	BotID        sql.NullString `json:"bot_id"`
+	UserID       sql.NullString `json:"user_id"`
+	Role         string         `json:"role"`
+	Instructions string         `json:"instructions"`
+	Metadata     string         `json:"metadata"`
+	CreatedAt    string         `json:"created_at"`
+	UpdatedAt    string         `json:"updated_at"`
+}
+
 type Bot struct {
 	ID                     string         `json:"id"`
 	OwnerUserID            string         `json:"owner_user_id"`
@@ -438,6 +485,57 @@ type StorageProvider struct {
 	Config    string `json:"config"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
+}
+
+type TeamFileLock struct {
+	ID          string         `json:"id"`
+	TeamID      string         `json:"team_id"`
+	Path        string         `json:"path"`
+	Scope       string         `json:"scope"`
+	OwnerType   string         `json:"owner_type"`
+	OwnerBotID  sql.NullString `json:"owner_bot_id"`
+	OwnerUserID sql.NullString `json:"owner_user_id"`
+	IssueID     sql.NullString `json:"issue_id"`
+	SessionID   sql.NullString `json:"session_id"`
+	HandoffID   sql.NullString `json:"handoff_id"`
+	AcquiredAt  string         `json:"acquired_at"`
+	RefreshedAt string         `json:"refreshed_at"`
+	ExpiresAt   string         `json:"expires_at"`
+	Metadata    string         `json:"metadata"`
+}
+
+type TeamIssue struct {
+	ID              string         `json:"id"`
+	TeamID          string         `json:"team_id"`
+	Number          int64          `json:"number"`
+	Title           string         `json:"title"`
+	Description     string         `json:"description"`
+	Status          string         `json:"status"`
+	AssigneeType    sql.NullString `json:"assignee_type"`
+	AssigneeBotID   sql.NullString `json:"assignee_bot_id"`
+	AssigneeUserID  sql.NullString `json:"assignee_user_id"`
+	CreatedByType   string         `json:"created_by_type"`
+	CreatedByBotID  sql.NullString `json:"created_by_bot_id"`
+	CreatedByUserID sql.NullString `json:"created_by_user_id"`
+	ParentIssueID   sql.NullString `json:"parent_issue_id"`
+	Metadata        string         `json:"metadata"`
+	ClosedAt        sql.NullString `json:"closed_at"`
+	CreatedAt       string         `json:"created_at"`
+	UpdatedAt       string         `json:"updated_at"`
+}
+
+type TeamIssueComment struct {
+	ID              string         `json:"id"`
+	IssueID         string         `json:"issue_id"`
+	TeamID          string         `json:"team_id"`
+	ParentCommentID sql.NullString `json:"parent_comment_id"`
+	AuthorType      string         `json:"author_type"`
+	AuthorBotID     sql.NullString `json:"author_bot_id"`
+	AuthorUserID    sql.NullString `json:"author_user_id"`
+	Content         string         `json:"content"`
+	Metadata        string         `json:"metadata"`
+	CreatedAt       string         `json:"created_at"`
+	UpdatedAt       string         `json:"updated_at"`
 }
 
 type ToolApprovalRequest struct {

@@ -50,6 +50,7 @@ func init() {
 		"_identities":    mustReadPrompt("prompts/_identities.md"),
 		"_schedule_task": mustReadPrompt("prompts/_schedule_task.md"),
 		"_subagent":      mustReadPrompt("prompts/_subagent.md"),
+		"_team":          mustReadPrompt("prompts/_team.md"),
 	}
 
 	systemChatTmpl = resolveIncludes(systemChatTmpl)
@@ -123,7 +124,8 @@ func GenerateSystemPrompt(params SystemPromptParams) string {
 		readToolDesc += " (also supports images: PNG, JPEG, GIF, WebP)"
 	}
 	basicTools := []string{readToolDesc}
-	basicTools = append(basicTools,
+	basicTools = append(
+		basicTools,
 		"- `write`: write file content",
 		"- `list`: list directory entries",
 		"- `edit`: replace exact text in a file",
@@ -155,6 +157,8 @@ func GenerateSystemPrompt(params SystemPromptParams) string {
 		"skillsSection":             skillsSection,
 		"platformIdentitiesSection": strings.TrimSpace(params.PlatformIdentitiesSection),
 		"fileSections":              fileSections,
+		"teamSection":               strings.TrimSpace(params.TeamSection),
+		"selfIdentity":              strings.TrimSpace(params.SelfIdentitySection),
 	})
 }
 
@@ -168,6 +172,14 @@ type SystemPromptParams struct {
 	SupportsImageInput        bool
 	DisplayEnabled            bool
 	PlatformIdentitiesSection string
+	TeamSection               string
+
+	// SelfIdentitySection is the bot's "Who you are" paragraph rendered
+	// at the very top of every system prompt. It is the canonical place
+	// for `bots.display_name`. Empty when the bot has no display name
+	// configured or when the caller does not have access to the bot row
+	// (e.g. subagent runs).
+	SelfIdentitySection string
 }
 
 func buildDisplayToolsSection(enabled bool) string {

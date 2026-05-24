@@ -28,6 +28,22 @@ const routes = [
           breadcrumb: i18nRef('sidebar.chat'),
         },
       },
+      {
+        name: 'team-workspace',
+        path: '/teams/:teamId',
+        component: () => import('@/pages/team-workspace/index.vue'),
+        meta: {
+          breadcrumb: i18nRef('sidebar.teams'),
+        },
+      },
+      {
+        name: 'team-issue',
+        path: '/teams/:teamId/issues/:issueId',
+        component: () => import('@/pages/team-workspace/issue.vue'),
+        meta: {
+          breadcrumb: i18nRef('sidebar.teams'),
+        },
+      },
     ],
   },
   {
@@ -72,6 +88,28 @@ const routes = [
         meta: {
           breadcrumb: i18nRef('sidebar.providers'),
         },
+      },
+      {
+        path: 'teams',
+        component: { render: () => h(RouterView) },
+        meta: {
+          breadcrumb: i18nRef('sidebar.teams'),
+        },
+        children: [
+          {
+            name: 'teams',
+            path: '',
+            component: () => import('@/pages/teams/index.vue'),
+          },
+          {
+            name: 'team-detail',
+            path: ':teamId',
+            component: () => import('@/pages/teams/detail.vue'),
+            meta: {
+              breadcrumb: (route: RouteLocationNormalized) => route.params.teamId,
+            },
+          },
+        ],
       },
       {
         name: 'web-search',

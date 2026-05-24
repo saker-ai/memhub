@@ -393,6 +393,14 @@ The canonical source of truth for the full PostgreSQL schema is `db/postgres/mig
 - `storage_providers` — Pluggable object storage backends
 - `bot_storage_bindings` — Per-bot storage backend selection
 
+**Agent Team**
+- `agent_teams` — Collaboration teams owned by a user (name, shared dir display name, instructions)
+- `agent_team_members` — Team membership rows (bot or user, optional role / per-team instructions)
+- `team_issues` — Team-scoped collaboration tasks (status, assignee, parent issue, metadata)
+- `team_issue_comments` — Issue comment thread (supports structured `[@Name](mention://...)` mentions)
+- `agent_handoffs` — Bot1 → Bot2 delegations created from mentions; tracks completion + return handoff
+- `team_file_locks` — Shared filesystem locks for the `/team` mount (TTL-based, scoped per file or prefix)
+
 ## Configuration
 
 The main configuration file is `config.toml` (copied from `conf/app.example.toml` or environment-specific templates for development), containing:
