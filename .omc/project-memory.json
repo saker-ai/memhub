@@ -1,0 +1,310 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1779698540405,
+  "projectRoot": "/home/vipas/workspace/saker-ai/mysaker/memhub",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      },
+      {
+        "name": "Rust",
+        "version": "1.90",
+        "confidence": "high",
+        "markers": [
+          "Cargo.toml"
+        ]
+      },
+      {
+        "name": "Go",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "go.mod"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vitest",
+        "version": "4.0.16",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cargo build",
+    "testCommand": "pnpm test",
+    "lintCommand": "pnpm lint",
+    "devCommand": "cargo run",
+    "scripts": {
+      "web:dev": "pnpm --filter @memohai/web dev",
+      "web:build": "pnpm --filter @memohai/web build",
+      "web:start": "pnpm --filter @memohai/web start",
+      "docs:dev": "pnpm --filter @memohai/docs dev",
+      "docs:build": "pnpm --filter @memohai/docs build",
+      "docs:preview": "pnpm --filter @memohai/docs preview",
+      "release": "bumpp",
+      "release:patch": "bumpp patch --yes",
+      "release:minor": "bumpp minor --yes",
+      "release:major": "bumpp major --yes",
+      "publish:npm": "node scripts/publish-packages.mjs",
+      "generate-sdk": "openapi-ts",
+      "lint": "eslint .",
+      "lint:fix": "eslint . --fix",
+      "test": "vitest",
+      "prepare": "husky"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [],
+    "mainDirectories": [
+      "assets",
+      "docs",
+      "scripts",
+      "spec"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779698540395,
+      "keyFiles": []
+    },
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 3,
+      "lastAccessed": 1779698540396,
+      "keyFiles": [
+        "logo.png",
+        "logo_title.png",
+        "telegram.jpg"
+      ]
+    },
+    "cmd": {
+      "path": "cmd",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779698540400,
+      "keyFiles": []
+    },
+    "conf": {
+      "path": "conf",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1779698540402,
+      "keyFiles": [
+        "app.apple.toml",
+        "app.docker.toml",
+        "app.example.toml",
+        "app.local.toml",
+        "app.windows.toml"
+      ]
+    },
+    "crates": {
+      "path": "crates",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779698540402,
+      "keyFiles": []
+    },
+    "db": {
+      "path": "db",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1779698540402,
+      "keyFiles": [
+        "embed.go"
+      ]
+    },
+    "deploy": {
+      "path": "deploy",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779698540402,
+      "keyFiles": []
+    },
+    "devenv": {
+      "path": "devenv",
+      "purpose": null,
+      "fileCount": 11,
+      "lastAccessed": 1779698540402,
+      "keyFiles": [
+        "Dockerfile.server",
+        "Dockerfile.web",
+        "app.dev.toml",
+        "app.sqlite.dev.toml",
+        "bridge-build.sh"
+      ]
+    },
+    "docker": {
+      "path": "docker",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1779698540403,
+      "keyFiles": [
+        "Dockerfile.server",
+        "Dockerfile.sparse",
+        "Dockerfile.vnc",
+        "Dockerfile.web",
+        "docker-compose.cn.yml"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 3,
+      "lastAccessed": 1779698540403,
+      "keyFiles": [
+        "README.md",
+        "package.json"
+      ]
+    },
+    "internal": {
+      "path": "internal",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779698540403,
+      "keyFiles": []
+    },
+    "packages": {
+      "path": "packages",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779698540403,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 9,
+      "lastAccessed": 1779698540403,
+      "keyFiles": [
+        "db-drop.sh",
+        "db-up.sh",
+        "desktop-install.sh",
+        "embed.go",
+        "install.sh"
+      ]
+    },
+    "spec": {
+      "path": "spec",
+      "purpose": "Test specifications",
+      "fileCount": 3,
+      "lastAccessed": 1779698540403,
+      "keyFiles": [
+        "docs.go",
+        "swagger.json",
+        "swagger.yaml"
+      ]
+    },
+    "docs/docs": {
+      "path": "docs/docs",
+      "purpose": "Documentation",
+      "fileCount": 2,
+      "lastAccessed": 1779698540404,
+      "keyFiles": [
+        "about.md",
+        "index.md"
+      ]
+    },
+    "packages/config": {
+      "path": "packages/config",
+      "purpose": "Configuration files",
+      "fileCount": 4,
+      "lastAccessed": 1779698540404,
+      "keyFiles": [
+        "README.md",
+        "package.json",
+        "tsconfig.json"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "cmd/agent/app.go",
+      "accessCount": 2,
+      "lastAccessed": 1779698738007,
+      "type": "file"
+    },
+    {
+      "path": "cmd/agent/module.go",
+      "accessCount": 2,
+      "lastAccessed": 1779698814540,
+      "type": "file"
+    },
+    {
+      "path": "Makefile",
+      "accessCount": 2,
+      "lastAccessed": 1779698997395,
+      "type": "file"
+    },
+    {
+      "path": "internal/embedded/assets.go",
+      "accessCount": 1,
+      "lastAccessed": 1779698602428,
+      "type": "file"
+    },
+    {
+      "path": "internal/handlers/file_embed.go",
+      "accessCount": 1,
+      "lastAccessed": 1779698619457,
+      "type": "file"
+    },
+    {
+      "path": "docker/Dockerfile.server",
+      "accessCount": 1,
+      "lastAccessed": 1779698643378,
+      "type": "file"
+    },
+    {
+      "path": "docker/Dockerfile.web",
+      "accessCount": 1,
+      "lastAccessed": 1779698654722,
+      "type": "file"
+    },
+    {
+      "path": "internal/server/server.go",
+      "accessCount": 1,
+      "lastAccessed": 1779698711715,
+      "type": "file"
+    },
+    {
+      "path": "LICENSE",
+      "accessCount": 1,
+      "lastAccessed": 1779700057880,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

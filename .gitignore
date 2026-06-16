@@ -94,6 +94,7 @@ tmp/
 
 # compiled files
 /memoh
+/memoh-server
 /agent
 /bridge
 
