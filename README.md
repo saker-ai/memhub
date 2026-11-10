@@ -238,3 +238,8 @@ See the [documentation](https://docs.memoh.ai/memory-providers/) for full setup 
 Made with ❤️ by MemohAI Team,
 
 Copyright (C) 2026 MemohAI (memoh.ai). All rights reserved.
+
+## Repository identity
+
+This is the **saker-ai/memhub fork of [memohai/Memoh](https://github.com/memohai/Memoh)**. The upstream documentation below retains its original product names and links. To build this fork, clone `https://github.com/saker-ai/memhub.git` instead of the upstream URL. Upstream installers and published desktop packages do not automatically include changes from this fork. Review [DEPLOYMENT.md](DEPLOYMENT.md), configure credentials and change default login details before exposing a deployment.
+
